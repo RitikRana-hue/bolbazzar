@@ -3,16 +3,12 @@
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import {
-    Clock,
     Gavel,
     Heart,
     TrendingUp,
     AlertCircle,
-    CheckCircle,
     XCircle,
     Eye,
-    Filter,
-    Calendar,
     Star,
     Zap,
     Timer

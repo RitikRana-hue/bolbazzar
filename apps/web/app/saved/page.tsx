@@ -3,7 +3,6 @@
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { Heart, Trash2, Share, Bell, Grid, List, Star } from 'lucide-react';
-import ProductCard from '../components/ui/ProductCard';
 
 interface SavedItem {
     id: string;
