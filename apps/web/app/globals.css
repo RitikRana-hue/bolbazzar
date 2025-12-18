@@ -2,6 +2,356 @@
 @tailwind components;
 @tailwind utilities;
 
+/* Hide main page scrollbar */
+html {
+  scrollbar-width: none;
+  /* Firefox */
+  -ms-overflow-style: none;
+  /* Internet Explorer 10+ */
+}
+
+html::-webkit-scrollbar {
+  display: none;
+  /* WebKit */
+}
+
+body {
+  scrollbar-width: none;
+  /* Firefox */
+  -ms-overflow-style: none;
+  /* Internet Explorer 10+ */
+}
+
+body::-webkit-scrollbar {
+  display: none;
+  /* WebKit */
+}
+
+/* Custom scrollbar for dropdown menus */
+.scrollbar-thin {
+  scrollbar-width: thin;
+  scrollbar-color: #d1d5db #f3f4f6;
+}
+
+.scrollbar-thin::-webkit-scrollbar {
+  width: 6px;
+}
+
+.scrollbar-thin::-webkit-scrollbar-track {
+  background: #f3f4f6;
+  border-radius: 3px;
+}
+
+.scrollbar-thin::-webkit-scrollbar-thumb {
+  background: #d1d5db;
+  border-radius: 3px;
+}
+
+.scrollbar-thin::-webkit-scrollbar-thumb:hover {
+  background: #9ca3af;
+}
+
+/* Metro UI Design Enhancements */
+@layer components {
+  .metro-tile {
+    @apply relative overflow-hidden transition-all duration-200 shadow-lg;
+  }
+
+  .metro-tile:hover {
+    @apply scale-105;
+  }
+
+  .metro-tile::before {
+    content: '';
+    @apply absolute inset-0 bg-black opacity-0 transition-opacity duration-200;
+  }
+
+  .metro-tile:hover::before {
+    @apply opacity-10;
+  }
+
+  .metro-text {
+    @apply font-light tracking-wide uppercase;
+  }
+
+  .metro-title {
+    @apply text-4xl font-light text-gray-900 uppercase tracking-wide;
+  }
+
+  .metro-subtitle {
+    @apply text-xs opacity-80 uppercase tracking-wider;
+  }
+
+  .metro-price {
+    @apply text-2xl font-bold;
+  }
+
+  .metro-price-large {
+    @apply text-4xl font-bold;
+  }
+}
+
+/* Nokia Lumia inspired colors */
+:root {
+  --metro-teal: #00ABA9;
+  --metro-orange: #F09609;
+  --metro-blue: #1BA1E2;
+  --metro-red: #E51400;
+  --metro-purple: #8C0095;
+  --metro-green: #00A300;
+  --metro-dark-blue: #2D89EF;
+  --metro-lime: #8CBF26;
+  --metro-magenta: #FF0097;
+  --metro-brown: #A05000;
+}
+
+/* Custom animations for Metro tiles */
+@keyframes metro-pulse {
+
+  0%,
+  100% {
+    transform: scale(1);
+  }
+
+  50% {
+    transform: scale(1.02);
+  }
+}
+
+.metro-pulse {
+  animation: metro-pulse 2s ease-in-out infinite;
+}
+
+/* Typography improvements */
+.metro-font {
+  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+  font-weight: 300;
+}
+
+/* Hover effects for tiles */
+.metro-hover-effect {
+  position: relative;
+  overflow: hidden;
+}
+
+.metro-hover-effect::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -100%;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.2), transparent);
+  transition: left 0.5s;
+}
+
+.metro-hover-effect:hover::after {
+  left: 100%;
+}
+
+/* Enhanced Metro Bid Tiles with Background Images */
+.metro-bid-tile {
+  position: relative;
+  overflow: hidden;
+  border-radius: 8px;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.metro-bid-tile:hover {
+  transform: scale(1.05);
+  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
+}
+
+.metro-bid-tile::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: linear-gradient(135deg, rgba(0, 0, 0, 0.8) 0%, rgba(0, 0, 0, 0.4) 50%, rgba(0, 0, 0, 0.2) 100%);
+  z-index: 1;
+}
+
+.metro-bid-tile:hover::before {
+  background: linear-gradient(135deg, rgba(0, 0, 0, 0.9) 0%, rgba(0, 0, 0, 0.5) 50%, rgba(0, 0, 0, 0.3) 100%);
+}
+
+/* Shine effect for premium tiles */
+@keyframes metro-shine {
+  0% {
+    transform: translateX(-100%) skewX(-15deg);
+  }
+
+  100% {
+    transform: translateX(200%) skewX(-15deg);
+  }
+}
+
+.metro-shine {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.3), transparent);
+  transform: translateX(-100%) skewX(-15deg);
+  transition: transform 0.7s ease-out;
+}
+
+.metro-bid-tile:hover .metro-shine {
+  animation: metro-shine 1s ease-out;
+}
+
+/* Dynamic grid for varying tile sizes */
+.metro-dynamic-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 1rem;
+  grid-auto-rows: 150px;
+}
+
+@media (min-width: 768px) {
+  .metro-dynamic-grid {
+    grid-template-columns: repeat(4, 1fr);
+    grid-auto-rows: 200px;
+  }
+}
+
+@media (min-width: 1024px) {
+  .metro-dynamic-grid {
+    grid-template-columns: repeat(6, 1fr);
+    grid-auto-rows: 200px;
+  }
+}
+
+/* Premium glow effect for high-value items */
+.metro-premium-glow {
+  box-shadow: 0 0 20px rgba(255, 215, 0, 0.3);
+}
+
+.metro-premium-glow:hover {
+  box-shadow: 0 0 30px rgba(255, 215, 0, 0.5);
+}
+
+/* Modern animations */
+@keyframes blob {
+  0% {
+    transform: translate(0px, 0px) scale(1);
+  }
+
+  33% {
+    transform: translate(30px, -50px) scale(1.1);
+  }
+
+  66% {
+    transform: translate(-20px, 20px) scale(0.9);
+  }
+
+  100% {
+    transform: translate(0px, 0px) scale(1);
+  }
+}
+
+.animate-blob {
+  animation: blob 7s infinite;
+}
+
+.animation-delay-2000 {
+  animation-delay: 2s;
+}
+
+.animation-delay-4000 {
+  animation-delay: 4s;
+}
+
+/* Modern glassmorphism effects */
+.glass {
+  background: rgba(255, 255, 255, 0.1);
+  backdrop-filter: blur(10px);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+.glass-dark {
+  background: rgba(0, 0, 0, 0.1);
+  backdrop-filter: blur(10px);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+/* Modern card hover effects */
+.modern-card {
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.modern-card:hover {
+  transform: translateY(-8px);
+  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
+}
+
+/* Gradient text effects */
+.gradient-text-modern {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+/* Modern button styles */
+.btn-modern {
+  position: relative;
+  overflow: hidden;
+  transition: all 0.3s ease;
+}
+
+.btn-modern::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -100%;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.2), transparent);
+  transition: left 0.5s;
+}
+
+.btn-modern:hover::before {
+  left: 100%;
+}
+
+/* Smooth text transitions for hero section */
+@keyframes fadeInUp {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.hero-text-animate {
+  animation: fadeInUp 0.6s ease-out;
+}
+
+/* Smooth image transitions */
+@keyframes fadeInScale {
+  from {
+    opacity: 0;
+    transform: scale(0.95);
+  }
+
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+.hero-image-animate {
+  animation: fadeInScale 0.7s ease-out;
+}
+
 * {
   margin: 0;
   padding: 0;

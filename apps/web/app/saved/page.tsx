@@ -41,7 +41,7 @@ export default function SavedPage() {
                     title: 'iPhone 15 Pro Max 256GB - Natural Titanium',
                     price: 1199.99,
                     originalPrice: 1299.99,
-                    image: 'https://images.unsplash.com/photo-1601784551446-20c9e07cdbf1?w=300&h=300&fit=crop',
+                    image: 'https://images.unsplash.com/photo-1511707171634-5f897ff02aa9?ixlib=rb-4.0.3&auto=format&fit=crop&w=300&q=80',
                     seller: 'TechStore Pro',
                     rating: 4.8,
                     reviews: 1247,
@@ -55,7 +55,7 @@ export default function SavedPage() {
                     title: 'Nike Air Max 270 Sneakers',
                     price: 89.99,
                     originalPrice: 150.00,
-                    image: 'https://images.unsplash.com/photo-1542291026-7eec264c27ff?w=300&h=300&fit=crop',
+                    image: 'https://images.unsplash.com/photo-1542291026-7eec264c27ff?ixlib=rb-4.0.3&auto=format&fit=crop&w=300&q=80',
                     seller: 'Sneaker Hub',
                     rating: 4.7,
                     reviews: 634,
@@ -68,13 +68,55 @@ export default function SavedPage() {
                     id: '3',
                     title: 'Vintage Rolex Submariner',
                     price: 8999.99,
-                    image: 'https://images.unsplash.com/photo-1523170335258-f5c6c6bd6eaf?w=300&h=300&fit=crop',
+                    image: 'https://images.unsplash.com/photo-1523170335258-f5c6c6bd6eaf?ixlib=rb-4.0.3&auto=format&fit=crop&w=300&q=80',
                     seller: 'Luxury Watches',
                     rating: 4.9,
                     reviews: 89,
                     category: 'Collectibles',
                     dateAdded: '2024-12-05',
                     inStock: false
+                },
+                {
+                    id: '4',
+                    title: 'MacBook Pro M3 14-inch 512GB',
+                    price: 2199.99,
+                    originalPrice: 2499.99,
+                    image: 'https://images.unsplash.com/photo-1496181133206-80ce9b88a853?ixlib=rb-4.0.3&auto=format&fit=crop&w=300&q=80',
+                    seller: 'Apple Store',
+                    rating: 4.9,
+                    reviews: 892,
+                    category: 'Electronics',
+                    dateAdded: '2024-12-12',
+                    priceChange: -100.00,
+                    inStock: true
+                },
+                {
+                    id: '5',
+                    title: 'Sony WH-1000XM5 Headphones',
+                    price: 299.99,
+                    originalPrice: 399.99,
+                    image: 'https://images.unsplash.com/photo-1545454675-3531b543be5d?ixlib=rb-4.0.3&auto=format&fit=crop&w=300&q=80',
+                    seller: 'Audio Pro',
+                    rating: 4.6,
+                    reviews: 456,
+                    category: 'Electronics',
+                    dateAdded: '2024-12-11',
+                    priceChange: -25.00,
+                    inStock: true
+                },
+                {
+                    id: '6',
+                    title: 'Gaming Chair RGB LED',
+                    price: 249.99,
+                    originalPrice: 349.99,
+                    image: 'https://images.unsplash.com/photo-1586953208448-b95a79798f07?ixlib=rb-4.0.3&auto=format&fit=crop&w=300&q=80',
+                    seller: 'Gaming World',
+                    rating: 4.4,
+                    reviews: 234,
+                    category: 'Home & Garden',
+                    dateAdded: '2024-12-09',
+                    priceChange: 15.00,
+                    inStock: true
                 }
             ];
 
@@ -214,46 +256,89 @@ export default function SavedPage() {
                         {viewMode === 'grid' ? (
                             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
                                 {sortedItems.map((item) => (
-                                    <div key={item.id} className="relative group">
-                                        <ProductCard
-                                            id={item.id}
-                                            title={item.title}
-                                            price={item.price}
-                                            originalPrice={item.originalPrice}
-                                            image={item.image}
-                                            seller={item.seller}
-                                            rating={item.rating}
-                                            reviews={item.reviews}
-                                        />
+                                    <div key={item.id} className="relative group bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden hover:shadow-lg transition-all duration-300">
+                                        <div className="relative">
+                                            <img
+                                                src={item.image}
+                                                alt={item.title}
+                                                className="w-full h-48 object-cover group-hover:scale-105 transition-transform duration-300"
+                                                onError={(e) => {
+                                                    const target = e.target as HTMLImageElement;
+                                                    target.src = 'https://images.unsplash.com/photo-1560472354-b33ff0c44a43?ixlib=rb-4.0.3&auto=format&fit=crop&w=300&q=80';
+                                                }}
+                                            />
 
-                                        {/* Saved Controls */}
-                                        <div className="absolute top-2 right-2 flex space-x-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                                            <button
-                                                onClick={() => removeFromSaved(item.id)}
-                                                className="p-2 bg-white/90 rounded-full shadow-md hover:bg-red-50 text-red-600"
-                                                title="Remove from saved"
-                                            >
-                                                <Trash2 size={16} />
-                                            </button>
+                                            {/* Saved Controls */}
+                                            <div className="absolute top-3 right-3 flex space-x-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                                                <button
+                                                    onClick={() => removeFromSaved(item.id)}
+                                                    className="p-2 bg-white/90 backdrop-blur-sm rounded-full shadow-md hover:bg-red-50 text-red-600 hover:scale-110 transition-all duration-200"
+                                                    title="Remove from saved"
+                                                >
+                                                    <Trash2 size={16} />
+                                                </button>
+                                            </div>
+
+                                            {/* Status Badges */}
+                                            <div className="absolute top-3 left-3 flex flex-col space-y-1">
+                                                {item.priceChange && item.priceChange < 0 && (
+                                                    <span className="bg-green-100 text-green-800 text-xs px-2 py-1 rounded-full font-medium shadow-sm">
+                                                        ${Math.abs(item.priceChange).toFixed(2)} off
+                                                    </span>
+                                                )}
+                                                {item.priceChange && item.priceChange > 0 && (
+                                                    <span className="bg-red-100 text-red-800 text-xs px-2 py-1 rounded-full font-medium shadow-sm">
+                                                        +${item.priceChange.toFixed(2)}
+                                                    </span>
+                                                )}
+                                                {!item.inStock && (
+                                                    <span className="bg-red-100 text-red-800 text-xs px-2 py-1 rounded-full font-medium shadow-sm">
+                                                        Out of stock
+                                                    </span>
+                                                )}
+                                            </div>
                                         </div>
 
-                                        {/* Status Badges */}
-                                        <div className="absolute top-2 left-2 flex flex-col space-y-1">
-                                            {item.priceChange && item.priceChange < 0 && (
-                                                <span className="bg-green-100 text-green-800 text-xs px-2 py-1 rounded-full">
-                                                    ${Math.abs(item.priceChange).toFixed(2)} off
+                                        <div className="p-4">
+                                            <Link
+                                                href={`/p/${item.id}`}
+                                                className="font-semibold text-gray-900 hover:text-blue-600 line-clamp-2 group-hover:text-blue-600 transition-colors mb-2 block"
+                                            >
+                                                {item.title}
+                                            </Link>
+
+                                            <div className="flex items-center space-x-2 mb-3">
+                                                <span className="text-xl font-bold text-gray-900">
+                                                    ${item.price.toFixed(2)}
                                                 </span>
-                                            )}
-                                            {item.priceChange && item.priceChange > 0 && (
-                                                <span className="bg-red-100 text-red-800 text-xs px-2 py-1 rounded-full">
-                                                    +${item.priceChange.toFixed(2)}
+                                                {item.originalPrice && item.originalPrice > item.price && (
+                                                    <>
+                                                        <span className="text-sm text-gray-500 line-through">
+                                                            ${item.originalPrice.toFixed(2)}
+                                                        </span>
+                                                        <span className="text-xs bg-green-100 text-green-800 px-2 py-1 rounded-full font-medium">
+                                                            {Math.round(((item.originalPrice - item.price) / item.originalPrice) * 100)}% OFF
+                                                        </span>
+                                                    </>
+                                                )}
+                                            </div>
+
+                                            <div className="flex items-center justify-between text-sm text-gray-600">
+                                                <div className="flex items-center space-x-1">
+                                                    <div className="flex items-center">
+                                                        {[...Array(5)].map((_, i) => (
+                                                            <Star
+                                                                key={i}
+                                                                className={`h-3 w-3 ${i < Math.floor(item.rating) ? 'text-yellow-400 fill-current' : 'text-gray-300'}`}
+                                                            />
+                                                        ))}
+                                                    </div>
+                                                    <span>({item.reviews})</span>
+                                                </div>
+                                                <span className="text-xs text-gray-500">
+                                                    Saved {new Date(item.dateAdded).toLocaleDateString()}
                                                 </span>
-                                            )}
-                                            {!item.inStock && (
-                                                <span className="bg-red-100 text-red-800 text-xs px-2 py-1 rounded-full">
-                                                    Out of stock
-                                                </span>
-                                            )}
+                                            </div>
                                         </div>
                                     </div>
                                 ))}
