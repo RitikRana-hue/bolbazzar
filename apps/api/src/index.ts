@@ -21,19 +21,26 @@ import notificationRoutes from './routes/notifications';
 import deliveryRoutes from './routes/delivery';
 import channelRoutes from './routes/channels';
 import paymentRoutes from './routes/payments';
+import categoryRoutes from './routes/categories';
+import uploadRoutes from './routes/upload';
 
 const app: Express = express();
 const httpServer = createServer(app);
 const io = new SocketIOServer(httpServer, {
     cors: {
-        origin: process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000',
+        origin: process.env.FRONTEND_URL || 'http://localhost:3000',
         methods: ['GET', 'POST'],
     },
 });
 
 // Middleware
 app.use(helmet());
-app.use(cors());
+app.use(cors({
+    origin: process.env.FRONTEND_URL || 'http://localhost:3000',
+    credentials: true,
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization']
+}));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
@@ -51,6 +58,7 @@ app.get('/health', (_req: Request, res: Response) => {
 
 // API Routes
 app.use('/auth', authRoutes);
+app.use('/categories', categoryRoutes);
 app.use('/listings', listingRoutes);
 app.use('/auctions', auctionRoutes);
 app.use('/orders', orderRoutes);
@@ -61,6 +69,7 @@ app.use('/notifications', notificationRoutes);
 app.use('/delivery', deliveryRoutes);
 app.use('/channels', channelRoutes);
 app.use('/payments', paymentRoutes);
+app.use('/upload', uploadRoutes);
 
 // Socket.IO events
 io.on('connection', (socket) => {
@@ -93,7 +102,7 @@ app.use((err: any, _req: Request, res: Response) => {
     });
 });
 
-const PORT = process.env.PORT || 3001;
+const PORT = process.env.PORT || 4001;
 
 httpServer.listen(PORT, () => {
     console.log(`🚀 Server running on port ${PORT}`);

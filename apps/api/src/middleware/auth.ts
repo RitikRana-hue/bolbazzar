@@ -2,6 +2,8 @@ import { Request, Response, NextFunction } from 'express';
 import jwt from 'jsonwebtoken';
 import { query } from '../db';
 
+const JWT_SECRET = process.env.JWT_SECRET || 'your-super-secret-jwt-key-change-this-in-production';
+
 interface AuthRequest extends Request {
     user?: {
         id: string;
@@ -19,11 +21,14 @@ export const authenticateToken = async (req: AuthRequest, res: Response, next: N
             return res.status(401).json({ error: 'Access token required' });
         }
 
-        const decoded = jwt.verify(token, process.env.JWT_SECRET || 'fallback-secret') as any;
+        const decoded = jwt.verify(token, JWT_SECRET, {
+            issuer: 'instasell-api',
+            audience: 'instasell-web'
+        }) as any;
 
         // Get user from database
         const result = await query(
-            'SELECT id, email, role, isActive FROM users WHERE id = $1',
+            'SELECT id, email, role, "isActive" FROM users WHERE id = $1',
             [decoded.userId]
         );
 

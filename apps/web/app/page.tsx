@@ -49,7 +49,7 @@ const slides = [
         description: 'Save big on top brands and popular products.',
         image: 'https://images.unsplash.com/photo-1556742049-0cfed4f6a45d?ixlib=rb-4.0.3&auto=format&fit=crop&w=400&q=80',
         buttonText: 'Start Shopping',
-        buttonLink: '/deals'
+        buttonLink: '/daily-deals'
     },
     {
         title: 'New arrivals just for you',

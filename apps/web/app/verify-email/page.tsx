@@ -4,6 +4,7 @@ import { useState, useEffect, Suspense } from 'react';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { Mail, CheckCircle, RefreshCw, ArrowLeft, Gavel } from 'lucide-react';
+import { getApiUrl } from '@/lib/config';
 
 function VerifyEmailContent() {
     const [isLoading, setIsLoading] = useState(false);
@@ -29,7 +30,7 @@ function VerifyEmailContent() {
         setError('');
 
         try {
-            const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/auth/verify-email`, {
+            const response = await fetch(getApiUrl('/auth/verify-email'), {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
@@ -68,7 +69,7 @@ function VerifyEmailContent() {
         setMessage('');
 
         try {
-            const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/auth/resend-verification`, {
+            const response = await fetch(getApiUrl('/auth/resend-verification'), {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',

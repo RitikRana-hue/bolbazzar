@@ -2,16 +2,17 @@ import { Router, Request, Response } from 'express';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import { query, transaction } from '../db';
-// Email service stub functions
-const sendVerificationEmail = async (email: string, data: { name: string; verificationUrl: string }) => {
-    console.log(`Verification email would be sent to ${email} with URL: ${data.verificationUrl}`);
-};
-
-const sendPasswordResetEmail = async (email: string, data: { name: string; resetUrl: string }) => {
-    console.log(`Password reset email would be sent to ${email} with URL: ${data.resetUrl}`);
-};
+import emailService from '../services/email.service';
 import { generateToken, verifyToken, generateRandomToken, generatePasswordResetToken } from '../utils/auth';
 import { authenticateToken } from '../middleware/auth';
+
+interface AuthRequest extends Request {
+    user?: {
+        id: string;
+        email: string;
+        role: string;
+    };
+}
 
 const router = Router();
 
@@ -47,40 +48,42 @@ router.post('/register', async (req: Request, res: Response) => {
 
         // Create user
         const result = await transaction(async (client) => {
+            const userId = `user_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+            
             const user = await client.query(`
-                INSERT INTO users (email, username, password, role, emailVerifyToken)
-                VALUES ($1, $2, $3, $4, $5)
-                RETURNING id, email, username, role, isEmailVerified, createdAt
-            `, [email, username, hashedPassword, role, emailVerifyToken]);
+                INSERT INTO users (id, email, username, password, role, "emailVerifyToken", "createdAt", "updatedAt")
+                VALUES ($1, $2, $3, $4, $5, $6, NOW(), NOW())
+                RETURNING id, email, username, role, "isEmailVerified", "createdAt"
+            `, [userId, email, username, hashedPassword, role, emailVerifyToken]);
 
             // Create user profile
+            const profileId = `profile_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
             await client.query(`
-                INSERT INTO user_profiles (userId)
-                VALUES ($1)
-            `, [user.rows[0].id]);
+                INSERT INTO user_profiles (id, "userId", "createdAt", "updatedAt")
+                VALUES ($1, $2, NOW(), NOW())
+            `, [profileId, userId]);
 
             // Create wallet for all users
+            const walletId = `wallet_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
             await client.query(`
-                INSERT INTO wallets (userId)
-                VALUES ($1)
-            `, [user.rows[0].id]);
+                INSERT INTO wallets (id, "userId", "createdAt", "updatedAt")
+                VALUES ($1, $2, NOW(), NOW())
+            `, [walletId, userId]);
 
             // Create gas wallet for sellers
-            if (role === 'seller') {
+            if (role === 'SELLER') {
+                const gasWalletId = `gas_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
                 await client.query(`
-                    INSERT INTO gas_wallets (userId)
-                    VALUES ($1)
-                `, [user.rows[0].id]);
+                    INSERT INTO gas_wallets (id, "userId", "createdAt", "updatedAt")
+                    VALUES ($1, $2, NOW(), NOW())
+                `, [gasWalletId, userId]);
             }
 
             return user.rows[0];
         });
 
-        // Send verification email
-        await sendVerificationEmail(email, {
-            name: username || email,
-            verificationUrl: `${process.env.FRONTEND_URL}/verify-email?token=${emailVerifyToken}`
-        });
+        // Send verification email (disabled for now)
+        console.log(`Verification email would be sent to ${email} with URL: ${process.env.FRONTEND_URL}/verify-email?token=${emailVerifyToken}`);
 
         res.status(201).json({
             message: 'User registered successfully. Please check your email to verify your account.',
@@ -103,10 +106,10 @@ router.post('/login', async (req: Request, res: Response) => {
 
         // Get user
         const result = await query(`
-            SELECT u.*, up.firstName, up.lastName, up.avatar
+            SELECT u.*, up."firstName", up."lastName", up.avatar
             FROM users u
-            LEFT JOIN user_profiles up ON up.userId = u.id
-            WHERE u.email = $1 AND u.isActive = true
+            LEFT JOIN user_profiles up ON up."userId" = u.id
+            WHERE u.email = $1 AND u."isActive" = true
         `, [email]);
 
         if (result.rows.length === 0) {
@@ -123,7 +126,7 @@ router.post('/login', async (req: Request, res: Response) => {
 
         // Update last login
         await query(
-            'UPDATE users SET lastLoginAt = NOW() WHERE id = $1',
+            'UPDATE users SET "lastLoginAt" = NOW() WHERE id = $1',
             [user.id]
         );
 
@@ -166,9 +169,9 @@ router.post('/verify-email', async (req: Request, res: Response) => {
         // Update user
         const result = await query(`
             UPDATE users 
-            SET isEmailVerified = true, emailVerifyToken = NULL
-            WHERE email = $1 AND emailVerifyToken = $2
-            RETURNING id, email, isEmailVerified
+            SET "isEmailVerified" = true, "emailVerifyToken" = NULL
+            WHERE email = $1 AND "emailVerifyToken" = $2
+            RETURNING id, email, "isEmailVerified"
         `, [decoded.email, token]);
 
         if (result.rows.length === 0) {
@@ -196,7 +199,7 @@ router.post('/forgot-password', async (req: Request, res: Response) => {
 
         // Check if user exists
         const user = await query(
-            'SELECT id, email, username FROM users WHERE email = $1 AND isActive = true',
+            'SELECT id, email, username FROM users WHERE email = $1 AND "isActive" = true',
             [email]
         );
 
@@ -210,15 +213,12 @@ router.post('/forgot-password', async (req: Request, res: Response) => {
 
         // Save reset token
         await query(
-            'UPDATE users SET resetPasswordToken = $1 WHERE id = $2',
+            'UPDATE users SET "resetPasswordToken" = $1 WHERE id = $2',
             [resetToken, user.rows[0].id]
         );
 
-        // Send reset email
-        await sendPasswordResetEmail(email, {
-            name: user.rows[0].username || email,
-            resetUrl: `${process.env.FRONTEND_URL}/reset-password?token=${resetToken}`
-        });
+        // Send reset email (disabled for now)
+        console.log(`Password reset email would be sent to ${email} with URL: ${process.env.FRONTEND_URL}/reset-password?token=${resetToken}`);
 
         res.json({ message: 'If the email exists, a reset link has been sent' });
     } catch (error) {
@@ -248,7 +248,7 @@ router.post('/reset-password', async (req: Request, res: Response) => {
 
         // Get user with reset token
         const user = await query(
-            'SELECT id FROM users WHERE id = $1 AND resetPasswordToken = $2',
+            'SELECT id FROM users WHERE id = $1 AND "resetPasswordToken" = $2',
             [decoded.userId, token]
         );
 
@@ -262,7 +262,7 @@ router.post('/reset-password', async (req: Request, res: Response) => {
         // Update password and clear reset token
         await query(`
             UPDATE users 
-            SET password = $1, resetPasswordToken = NULL
+            SET password = $1, "resetPasswordToken" = NULL
             WHERE id = $2
         `, [hashedPassword, decoded.userId]);
 
@@ -274,7 +274,7 @@ router.post('/reset-password', async (req: Request, res: Response) => {
 });
 
 // Change password (authenticated)
-router.post('/change-password', authenticateToken, async (req: Request, res: Response) => {
+router.post('/change-password', authenticateToken, async (req: AuthRequest, res: Response) => {
     try {
         const { currentPassword, newPassword } = req.body;
         const userId = req.user?.id;
@@ -320,20 +320,20 @@ router.post('/change-password', authenticateToken, async (req: Request, res: Res
 });
 
 // Get current user profile
-router.get('/me', authenticateToken, async (req: Request, res: Response) => {
+router.get('/me', authenticateToken, async (req: AuthRequest, res: Response) => {
     try {
         const userId = req.user?.id;
 
         const result = await query(`
             SELECT 
-                u.id, u.email, u.username, u.role, u.isEmailVerified, u.isActive, u.createdAt,
-                up.firstName, up.lastName, up.phone, up.avatar, up.bio, up.location,
-                w.balance, w.availableBalance,
-                gw.balance as gasBalance
+                u.id, u.email, u.username, u.role, u."isEmailVerified", u."isActive", u."createdAt",
+                up."firstName", up."lastName", up.phone, up.avatar, up.bio, up.location,
+                w.balance, w."availableBalance",
+                gw.balance as "gasBalance"
             FROM users u
-            LEFT JOIN user_profiles up ON up.userId = u.id
-            LEFT JOIN wallets w ON w.userId = u.id
-            LEFT JOIN gas_wallets gw ON gw.userId = u.id
+            LEFT JOIN user_profiles up ON up."userId" = u.id
+            LEFT JOIN wallets w ON w."userId" = u.id
+            LEFT JOIN gas_wallets gw ON gw."userId" = u.id
             WHERE u.id = $1
         `, [userId]);
 
@@ -349,7 +349,7 @@ router.get('/me', authenticateToken, async (req: Request, res: Response) => {
 });
 
 // Update user profile
-router.put('/profile', authenticateToken, async (req: Request, res: Response) => {
+router.put('/profile', authenticateToken, async (req: AuthRequest, res: Response) => {
     try {
         const userId = req.user?.id;
         const {
@@ -366,16 +366,16 @@ router.put('/profile', authenticateToken, async (req: Request, res: Response) =>
         const result = await query(`
             UPDATE user_profiles 
             SET 
-                firstName = COALESCE($1, firstName),
-                lastName = COALESCE($2, lastName),
+                "firstName" = COALESCE($1, "firstName"),
+                "lastName" = COALESCE($2, "lastName"),
                 phone = COALESCE($3, phone),
                 bio = COALESCE($4, bio),
                 location = COALESCE($5, location),
                 website = COALESCE($6, website),
-                dateOfBirth = COALESCE($7, dateOfBirth),
+                "dateOfBirth" = COALESCE($7, "dateOfBirth"),
                 gender = COALESCE($8, gender),
-                updatedAt = NOW()
-            WHERE userId = $9
+                "updatedAt" = NOW()
+            WHERE "userId" = $9
             RETURNING *
         `, [firstName, lastName, phone, bio, location, website, dateOfBirth, gender, userId]);
 

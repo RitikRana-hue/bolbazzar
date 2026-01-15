@@ -20,6 +20,7 @@ import {
     ShoppingBag,
     Award
 } from 'lucide-react';
+import ProtectedRoute from '../components/ProtectedRoute';
 
 export default function AccountPage() {
     // Mock user stats - replace with actual data
@@ -125,7 +126,8 @@ export default function AccountPage() {
     ];
 
     return (
-        <div className="space-y-8">
+        <ProtectedRoute>
+            <div className="space-y-8">
             {/* Welcome Section - Matching Reference Image */}
             <div className="bg-gradient-to-r from-blue-600 via-indigo-600 to-purple-600 rounded-xl p-8 text-white relative overflow-hidden">
                 {/* Background Pattern */}
@@ -287,6 +289,6 @@ export default function AccountPage() {
                     </div>
                 </div>
             </div>
-        </div>
+        </ProtectedRoute>
     );
 }

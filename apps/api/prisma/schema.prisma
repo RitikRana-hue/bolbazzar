@@ -7,7 +7,7 @@ generator client {
 
 datasource db {
   provider = "postgresql"
-  url      = env("DATABASE_URL")
+  url      = "postgresql://postgres:5616@localhost:5432/postgres"
 }
 
 // ============================================
@@ -260,6 +260,9 @@ model Order {
   shippedAt       DateTime?
   deliveredAt     DateTime?
   refundedAt      DateTime?
+  paidAt          DateTime?
+  escrowId        String?
+  escrowReleasedAt DateTime?
   createdAt       DateTime    @default(now())
   updatedAt       DateTime    @updatedAt
 
@@ -274,6 +277,7 @@ model Order {
   disputes        Dispute[]
   escrow          Escrow?
   conversations   Conversation[]
+  paymentIntents  PaymentIntent[]
 
   @@map("orders")
 }
@@ -352,11 +356,12 @@ model SellerSubscription {
 model Withdrawal {
   id            String           @id @default(cuid())
   userId        String
-  walletId      String
+  walletId      String?
   amount        Decimal          @db.Decimal(10, 2)
   method        WithdrawalMethod
-  accountDetails Json
+  accountDetails Json?
   status        WithdrawalStatus @default(PENDING)
+  requestedAt   DateTime         @default(now())
   processedAt   DateTime?
   completedAt   DateTime?
   adminNotes    String?
@@ -365,7 +370,7 @@ model Withdrawal {
 
   // Relations
   user          User             @relation(fields: [userId], references: [id])
-  wallet        Wallet           @relation(fields: [walletId], references: [id])
+  wallet        Wallet?          @relation(fields: [walletId], references: [id])
 
   @@map("withdrawals")
 }
@@ -473,6 +478,8 @@ model Escrow {
   releasedAt    DateTime?
   releaseReason String?
   canCompound   Boolean      @default(true)
+  paymentIntentId String?
+  disputeId     String?
   createdAt     DateTime     @default(now())
   updatedAt     DateTime     @updatedAt
 
@@ -653,6 +660,8 @@ model Notification {
   isRead      Boolean          @default(false)
   readAt      DateTime?
   actionUrl   String?
+  metadata    Json?
+  timestamp   DateTime         @default(now())
   createdAt   DateTime         @default(now())
 
   // Relations
@@ -822,6 +831,26 @@ model AdminLog {
   admin       User     @relation(fields: [adminId], references: [id])
 
   @@map("admin_logs")
+}
+
+// ============================================
+// PAYMENT INTENTS (for Stripe integration)
+// ============================================
+
+model PaymentIntent {
+  id                String        @id
+  orderId           String
+  amount            Decimal       @db.Decimal(10, 2)
+  currency          String        @default("usd")
+  status            String
+  paymentMethodType String?
+  createdAt         DateTime      @default(now())
+  updatedAt         DateTime      @updatedAt
+
+  // Relations
+  order             Order         @relation(fields: [orderId], references: [id])
+
+  @@map("payment_intents")
 }
 
 // ============================================
