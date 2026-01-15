@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { Clock, Zap, Heart, Star, ChevronRight } from 'lucide-react';
 import Timer from '../components/ui/Timer';
+import { getApiUrl } from '@/lib/config';
 
 interface Deal {
     id: string;
@@ -44,7 +45,8 @@ export default function DailyDealsPage() {
     const fetchDailyDeals = async () => {
         try {
             setLoading(true);
-            // Mock data - replace with actual API call
+            
+            // For now, use mock data (API integration can be added later)
             const mockDeals: Deal[] = [
                 {
                     id: '1',

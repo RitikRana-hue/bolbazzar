@@ -4,6 +4,7 @@ import { useContext } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { AuthContext } from '../context/AuthContext';
+import ProtectedRoute from '../components/ProtectedRoute';
 import {
     User,
     Package,
@@ -153,7 +154,8 @@ export default function AccountLayout({ children }: { children: React.ReactNode 
     const isSeller = user?.role === 'seller' || user?.role === 'admin';
 
     return (
-        <div className="min-h-screen bg-gray-50">
+        <ProtectedRoute>
+            <div className="min-h-screen bg-gray-50">
             <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
                 <div className="lg:grid lg:grid-cols-12 lg:gap-x-8">
                     {/* Sidebar */}
@@ -247,6 +249,6 @@ export default function AccountLayout({ children }: { children: React.ReactNode 
                     </main>
                 </div>
             </div>
-        </div>
+        </ProtectedRoute>
     );
 }

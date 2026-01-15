@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { Eye, EyeOff, Mail, Lock, ArrowRight, Gavel } from 'lucide-react';
 import { AuthContext } from '../context/AuthContext';
+import { getApiUrl } from '@/lib/config';
 
 export default function LoginPage() {
     const [formData, setFormData] = useState({
@@ -24,7 +25,7 @@ export default function LoginPage() {
         setError('');
 
         try {
-            const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/auth/login`, {
+            const response = await fetch(getApiUrl('/auth/login'), {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',

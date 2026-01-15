@@ -51,22 +51,6 @@ export function AuthProvider({ children }: AuthProviderProps) {
                 localStorage.removeItem('token');
                 localStorage.removeItem('user');
             }
-        } else {
-            // For demo purposes, create a demo user
-            const demoUser: User = {
-                id: 'demo-user-1',
-                email: 'demo@instasell.com',
-                role: 'seller',
-                firstName: 'Demo',
-                lastName: 'User',
-                name: 'Demo User',
-                isEmailVerified: true,
-                notifications: 3,
-                cartItems: 2,
-                isAdmin: false
-            };
-            setUser(demoUser);
-            setToken('demo-token');
         }
 
         setIsLoading(false);
@@ -85,7 +69,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
         localStorage.removeItem('token');
         localStorage.removeItem('user');
 
-        // Redirect to home page
+        // Force a page reload to clear any cached state
         window.location.href = '/';
     };
 

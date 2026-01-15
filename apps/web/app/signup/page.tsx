@@ -4,6 +4,7 @@ import { useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { Eye, EyeOff, Mail, Lock, User, Phone, ArrowRight, Gavel, Check } from 'lucide-react';
+import { getApiUrl } from '@/lib/config';
 
 export default function SignupPage() {
     const [formData, setFormData] = useState({
@@ -43,7 +44,7 @@ export default function SignupPage() {
         }
 
         try {
-            const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/auth/register`, {
+            const response = await fetch(getApiUrl('/auth/register'), {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
