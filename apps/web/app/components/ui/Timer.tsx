@@ -48,10 +48,11 @@ export default function Timer({
             }
 
             // Auto-extend logic (for auctions)
-            if (autoExtend && diff <= 5000 && !isExtended) { // Last 5 seconds
+            if (autoExtend && diff <= 5000 && !isExtended) {
                 setIsExtended(true);
-                // In real implementation, this would trigger an API call
-                console.log('Timer extended by', extensionTime, 'seconds');
+                if (process.env.NODE_ENV === 'development') {
+                    console.log('Timer extended by', extensionTime, 'seconds');
+                }
             }
 
             const days = Math.floor(diff / (1000 * 60 * 60 * 24));

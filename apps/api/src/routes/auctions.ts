@@ -3,6 +3,10 @@ import { query, transaction } from '../db';
 import { createNotification } from './notifications';
 import { io } from '../index'; // Socket.IO instance
 import { authenticateToken, requireSeller } from '../middleware/auth';
+import { validateBody, validateParams, validateQuery } from '../middleware/validation';
+import { placeBidSchema, idSchema, paginationSchema } from '../validation/schemas';
+import { biddingLimiter } from '../middleware/rateLimiting';
+import { auditBid } from '../middleware/auditLog';
 
 interface AuthRequest extends Request {
     user?: {
@@ -21,7 +25,7 @@ router.use('/:id/end', authenticateToken);
 router.use('/:id/watch', authenticateToken);
 
 // Get all active auctions
-router.get('/', async (req: AuthRequest, res: Response) => {
+router.get('/', validateQuery(paginationSchema), async (req: AuthRequest, res: Response) => {
     try {
         const {
             category,
@@ -127,7 +131,7 @@ router.get('/', async (req: AuthRequest, res: Response) => {
 });
 
 // Get single auction
-router.get('/:id', async (req: AuthRequest, res: Response) => {
+router.get('/:id', validateParams(idSchema), async (req: AuthRequest, res: Response) => {
     try {
         const { id } = req.params;
 
@@ -205,15 +209,11 @@ router.get('/:id', async (req: AuthRequest, res: Response) => {
 });
 
 // Place bid
-router.post('/:id/bid', async (req: AuthRequest, res: Response) => {
+router.post('/:id/bid', biddingLimiter, validateParams(idSchema), validateBody(placeBidSchema), async (req: AuthRequest, res: Response) => {
     try {
         const { id } = req.params;
         const userId = req.user?.id;
         const { amount, maxBid } = req.body;
-
-        if (!amount || amount <= 0) {
-            return res.status(400).json({ error: 'Valid bid amount is required' });
-        }
 
         const result = await transaction(async (client) => {
             // Get auction details with lock
@@ -324,12 +324,19 @@ router.post('/:id/bid', async (req: AuthRequest, res: Response) => {
             );
         }
 
+        // Audit successful bid
+        await auditBid.placeBid(req, id, amount, true);
+
         res.json({
             message: 'Bid placed successfully',
             bid: result
         });
     } catch (error) {
         console.error('Error placing bid:', error);
+
+        // Audit failed bid
+        await auditBid.placeBid(req, req.params.id, req.body.amount, false, error instanceof Error ? error.message : 'Failed to place bid');
+
         res.status(500).json({
             error: error instanceof Error ? error.message : 'Failed to place bid'
         });

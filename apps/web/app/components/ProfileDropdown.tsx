@@ -1,7 +1,6 @@
 'use client';
 
 import Link from 'next/link';
-import { useContext } from 'react';
 import {
     User,
     Package,
@@ -19,17 +18,16 @@ import {
     FileText,
     MapPin
 } from 'lucide-react';
-import { AuthContext } from '../context/AuthContext';
+import { useAuthStore } from '@/lib/store/auth-store';
 
 export default function ProfileDropdown() {
-    const auth = useContext(AuthContext);
-    const user = auth?.user;
+    const { user, logout } = useAuthStore();
 
     if (!user) return null;
 
-    const userRole = user.role || 'buyer';
-    const isAdmin = user.role === 'admin';
-    const isSeller = user.role === 'seller';
+    const userRole = user.role || 'BUYER';
+    const isAdmin = user.role === 'ADMIN';
+    const isSeller = user.role === 'SELLER';
 
     return (
         <div className="absolute right-0 top-full mt-1 w-80 bg-white rounded-xl shadow-2xl border border-gray-100 z-[9999] max-h-[85vh] overflow-hidden">
@@ -52,16 +50,16 @@ export default function ProfileDropdown() {
                             <p className="text-sm font-semibold text-gray-900 truncate">
                                 {user.firstName && user.lastName
                                     ? `${user.firstName} ${user.lastName}`
-                                    : user.name || user.email
+                                    : user.username || user.email
                                 }
                             </p>
                             <p className="text-xs text-gray-500 truncate">{user.email}</p>
                             <div className="flex items-center mt-1">
-                                <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium capitalize ${userRole === 'admin' ? 'bg-red-100 text-red-800' :
-                                    userRole === 'seller' ? 'bg-green-100 text-green-800' :
+                                <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium capitalize ${userRole === 'ADMIN' ? 'bg-red-100 text-red-800' :
+                                    userRole === 'SELLER' ? 'bg-green-100 text-green-800' :
                                         'bg-blue-100 text-blue-800'
                                     }`}>
-                                    {userRole === 'delivery_agent' ? 'Delivery Agent' : userRole}
+                                    {userRole === 'DELIVERY_AGENT' ? 'Delivery Agent' : userRole.toLowerCase()}
                                 </span>
                                 {user.isEmailVerified && (
                                     <span className="ml-2 inline-flex items-center text-green-600">
@@ -87,11 +85,7 @@ export default function ProfileDropdown() {
                     <Link href="/account/orders" className="flex items-center px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 transition-colors">
                         <Package className="h-4 w-4 mr-3 text-gray-400" />
                         My Orders
-                        {user.notifications && user.notifications > 0 && (
-                            <span className="ml-auto bg-red-500 text-white text-xs rounded-full px-2 py-0.5">
-                                {user.notifications}
-                            </span>
-                        )}
+                        {/* TODO: Get notifications count from store */}
                     </Link>
                     <Link href="/account/bids" className="flex items-center px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 transition-colors">
                         <Gavel className="h-4 w-4 mr-3 text-gray-400" />
@@ -206,7 +200,7 @@ export default function ProfileDropdown() {
                 {/* Logout */}
                 <div className="py-2 border-t border-gray-100">
                     <button
-                        onClick={auth?.logout}
+                        onClick={logout}
                         className="flex items-center w-full px-4 py-2 text-sm text-red-600 hover:bg-red-50 transition-colors"
                     >
                         <LogOut className="h-4 w-4 mr-3" />

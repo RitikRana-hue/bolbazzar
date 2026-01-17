@@ -103,7 +103,7 @@ export default function WalletTopUpPage() {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${localStorage.getItem('token')}`
+                    'Authorization': `Bearer ${localStorage.getItem('auth_token')}`
                 },
                 body: JSON.stringify({
                     amount: parseFloat(amount),
@@ -158,8 +158,8 @@ export default function WalletTopUpPage() {
                                     key={quickAmount}
                                     onClick={() => setAmount(quickAmount.toString())}
                                     className={`p-3 border rounded-lg text-center transition-colors ${amount === quickAmount.toString()
-                                            ? 'border-blue-500 bg-blue-50 text-blue-700'
-                                            : 'border-gray-200 hover:border-gray-300'
+                                        ? 'border-blue-500 bg-blue-50 text-blue-700'
+                                        : 'border-gray-200 hover:border-gray-300'
                                         }`}
                                 >
                                     ${quickAmount}
@@ -197,8 +197,8 @@ export default function WalletTopUpPage() {
                                 <div
                                     key={method.id}
                                     className={`border rounded-lg p-4 cursor-pointer transition-colors ${selectedMethod === method.id
-                                            ? 'border-blue-500 bg-blue-50'
-                                            : 'border-gray-200 hover:border-gray-300'
+                                        ? 'border-blue-500 bg-blue-50'
+                                        : 'border-gray-200 hover:border-gray-300'
                                         }`}
                                     onClick={() => setSelectedMethod(method.id)}
                                 >
@@ -213,8 +213,8 @@ export default function WalletTopUpPage() {
                                             <p className="text-xs text-gray-500">{method.fees}</p>
                                         </div>
                                         <div className={`w-4 h-4 rounded-full border-2 ${selectedMethod === method.id
-                                                ? 'border-blue-500 bg-blue-500'
-                                                : 'border-gray-300'
+                                            ? 'border-blue-500 bg-blue-500'
+                                            : 'border-gray-300'
                                             }`}>
                                             {selectedMethod === method.id && (
                                                 <div className="w-full h-full rounded-full bg-white scale-50"></div>
@@ -308,15 +308,15 @@ export default function WalletTopUpPage() {
                                         <div
                                             key={bank.code}
                                             className={`border rounded-lg p-3 cursor-pointer transition-colors ${selectedBank === bank.code
-                                                    ? 'border-blue-500 bg-blue-50'
-                                                    : 'border-gray-200 hover:border-gray-300'
+                                                ? 'border-blue-500 bg-blue-50'
+                                                : 'border-gray-200 hover:border-gray-300'
                                                 }`}
                                             onClick={() => setSelectedBank(bank.code)}
                                         >
                                             <div className="flex items-center space-x-3">
                                                 <div className={`w-4 h-4 rounded-full border-2 ${selectedBank === bank.code
-                                                        ? 'border-blue-500 bg-blue-500'
-                                                        : 'border-gray-300'
+                                                    ? 'border-blue-500 bg-blue-500'
+                                                    : 'border-gray-300'
                                                     }`}>
                                                     {selectedBank === bank.code && (
                                                         <div className="w-full h-full rounded-full bg-white scale-50"></div>

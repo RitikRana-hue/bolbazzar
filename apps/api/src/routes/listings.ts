@@ -2,6 +2,10 @@ import { Router, Request, Response } from 'express';
 import { query, transaction } from '../db';
 import { createNotification } from './notifications';
 import { authenticateToken } from '../middleware/auth';
+import { validateBody, validateParams, validateQuery } from '../middleware/validation';
+import { createListingSchema, updateListingSchema, idSchema, paginationSchema, searchSchema } from '../validation/schemas';
+import { listingLimiter, uploadLimiter } from '../middleware/rateLimiting';
+import { uploadWithValidation } from '../middleware/fileUpload';
 
 interface AuthRequest extends Request {
     user?: {
@@ -21,7 +25,7 @@ router.put('/:id', authenticateToken);
 router.delete('/:id', authenticateToken);
 
 // Get all listings with filters
-router.get('/', async (req: Request, res: Response) => {
+router.get('/', validateQuery(searchSchema), async (req: Request, res: Response) => {
     try {
         const {
             category,
@@ -139,7 +143,7 @@ router.get('/', async (req: Request, res: Response) => {
 });
 
 // Get single listing
-router.get('/:id', async (req: Request, res: Response) => {
+router.get('/:id', validateParams(idSchema), async (req: Request, res: Response) => {
     try {
         const { id } = req.params;
 
@@ -222,7 +226,7 @@ router.get('/:id', async (req: Request, res: Response) => {
 });
 
 // Create new listing
-router.post('/', async (req: AuthRequest, res: Response) => {
+router.post('/', listingLimiter, validateBody(createListingSchema), async (req: AuthRequest, res: Response) => {
     try {
         const userId = req.user?.id;
         if (!userId) {
@@ -246,13 +250,6 @@ router.post('/', async (req: AuthRequest, res: Response) => {
             isAuction,
             auctionData
         } = req.body;
-
-        // Validation
-        if (!categoryId || !title || !description || !price) {
-            return res.status(400).json({
-                error: 'Category, title, description, and price are required'
-            });
-        }
 
         const result = await transaction(async (client) => {
             // Create product

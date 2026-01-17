@@ -1,9 +1,10 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { Eye, EyeOff, Mail, Lock, User, Phone, ArrowRight, Gavel, Check } from 'lucide-react';
+import { useAuthStore } from '@/lib/store/auth-store';
 
 export default function SignupPage() {
     const [formData, setFormData] = useState({
@@ -13,65 +14,49 @@ export default function SignupPage() {
         phone: '',
         password: '',
         confirmPassword: '',
-        role: 'buyer',
+        role: 'BUYER',
         agreeToTerms: false
     });
     const [showPassword, setShowPassword] = useState(false);
     const [showConfirmPassword, setShowConfirmPassword] = useState(false);
-    const [isLoading, setIsLoading] = useState(false);
     const [error, setError] = useState('');
     const [step, setStep] = useState(1);
 
+    const { register, isLoading, isAuthenticated } = useAuthStore();
     const router = useRouter();
+
+    // Redirect if already authenticated
+    useEffect(() => {
+        if (isAuthenticated) {
+            router.push('/account');
+        }
+    }, [isAuthenticated, router]);
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
-        setIsLoading(true);
         setError('');
 
         // Validation
         if (formData.password !== formData.confirmPassword) {
             setError('Passwords do not match');
-            setIsLoading(false);
             return;
         }
 
         if (!formData.agreeToTerms) {
             setError('Please agree to the terms and conditions');
-            setIsLoading(false);
             return;
         }
 
         try {
-            const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/auth/register`, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({
-                    email: formData.email,
-                    password: formData.password,
-                    role: formData.role,
-                    profile: {
-                        firstName: formData.firstName,
-                        lastName: formData.lastName,
-                        phone: formData.phone
-                    }
-                }),
-            });
+            const username = `${formData.firstName} ${formData.lastName}`.trim();
+            const role = formData.role.toUpperCase() as 'BUYER' | 'SELLER';
 
-            const data = await response.json();
+            await register(formData.email, formData.password, username, role);
 
-            if (response.ok) {
-                // Redirect to email verification page
-                router.push(`/verify-email?email=${encodeURIComponent(formData.email)}`);
-            } else {
-                setError(data.error || 'Registration failed');
-            }
-        } catch (error) {
-            setError('Network error. Please try again.');
-        } finally {
-            setIsLoading(false);
+            // Redirect to email verification page
+            router.push(`/verify-email?email=${encodeURIComponent(formData.email)}`);
+        } catch (err: any) {
+            setError(err.message || 'Registration failed. Please try again.');
         }
     };
 
@@ -256,12 +241,12 @@ export default function SignupPage() {
                                         I want to *
                                     </label>
                                     <div className="grid grid-cols-2 gap-4">
-                                        <label className={`relative flex cursor-pointer rounded-lg border p-4 focus:outline-none ${formData.role === 'buyer' ? 'border-blue-600 bg-blue-50' : 'border-gray-300'}`}>
+                                        <label className={`relative flex cursor-pointer rounded-lg border p-4 focus:outline-none ${formData.role === 'BUYER' ? 'border-blue-600 bg-blue-50' : 'border-gray-300'}`}>
                                             <input
                                                 type="radio"
                                                 name="role"
-                                                value="buyer"
-                                                checked={formData.role === 'buyer'}
+                                                value="BUYER"
+                                                checked={formData.role === 'BUYER'}
                                                 onChange={handleChange}
                                                 className="sr-only"
                                             />
@@ -271,12 +256,12 @@ export default function SignupPage() {
                                             </div>
                                         </label>
 
-                                        <label className={`relative flex cursor-pointer rounded-lg border p-4 focus:outline-none ${formData.role === 'seller' ? 'border-blue-600 bg-blue-50' : 'border-gray-300'}`}>
+                                        <label className={`relative flex cursor-pointer rounded-lg border p-4 focus:outline-none ${formData.role === 'SELLER' ? 'border-blue-600 bg-blue-50' : 'border-gray-300'}`}>
                                             <input
                                                 type="radio"
                                                 name="role"
-                                                value="seller"
-                                                checked={formData.role === 'seller'}
+                                                value="SELLER"
+                                                checked={formData.role === 'SELLER'}
                                                 onChange={handleChange}
                                                 className="sr-only"
                                             />

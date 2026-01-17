@@ -107,7 +107,27 @@ export default function AuctionCard({
         };
 
         updateTimer();
-        const interval = setInterval(updateTimer, 1000);
+
+        // Optimize: Update less frequently based on time remaining
+        const now = new Date().getTime();
+        const end = new Date(auctionData.endTime).getTime();
+        const diff = end - now;
+
+        let updateInterval = 1000; // Default 1 second
+
+        if (diff > 24 * 60 * 60 * 1000) {
+            // More than 24 hours: update every 60 seconds
+            updateInterval = 60000;
+        } else if (diff > 60 * 60 * 1000) {
+            // More than 1 hour: update every 10 seconds
+            updateInterval = 10000;
+        } else if (diff > 5 * 60 * 1000) {
+            // More than 5 minutes: update every 5 seconds
+            updateInterval = 5000;
+        }
+        // Less than 5 minutes: update every second (default)
+
+        const interval = setInterval(updateTimer, updateInterval);
 
         return () => clearInterval(interval);
     }, [auctionData.endTime]);

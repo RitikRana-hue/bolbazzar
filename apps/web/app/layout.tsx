@@ -2,7 +2,6 @@ import type { Metadata } from 'next';
 import './globals.css';
 import Header from './components/Header';
 import Footer from './components/Footer';
-import { AuthProvider } from './context/AuthContext';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import { ToastProvider } from './components/ui/Toast';
 
@@ -36,11 +35,9 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             <body className="bg-gray-50 antialiased">
                 <ErrorBoundary>
                     <ToastProvider>
-                        <AuthProvider>
-                            <Header />
-                            <main className="min-h-screen">{children}</main>
-                            <Footer />
-                        </AuthProvider>
+                        <Header />
+                        <main className="min-h-screen">{children}</main>
+                        <Footer />
                     </ToastProvider>
                 </ErrorBoundary>
             </body>

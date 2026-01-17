@@ -12,22 +12,26 @@ const sendPasswordResetEmail = async (email: string, data: { name: string; reset
 };
 import { generateToken, verifyToken, generateRandomToken, generatePasswordResetToken } from '../utils/auth';
 import { authenticateToken } from '../middleware/auth';
+import { validateBody } from '../middleware/validation';
+import {
+    registerSchema,
+    loginSchema,
+    changePasswordSchema,
+    forgotPasswordSchema,
+    resetPasswordSchema,
+    refreshTokenSchema,
+    updateProfileSchema
+} from '../validation/schemas';
+import { TokenService } from '../services/token.service';
+import { authLimiter, passwordResetLimiter } from '../middleware/rateLimiting';
+import { auditAuth } from '../middleware/auditLog';
 
 const router = Router();
 
 // Register new user
-router.post('/register', async (req: Request, res: Response) => {
+router.post('/register', authLimiter, validateBody(registerSchema), async (req: Request, res: Response) => {
     try {
-        const { email, username, password, role = 'buyer' } = req.body;
-
-        // Validation
-        if (!email || !password) {
-            return res.status(400).json({ error: 'Email and password are required' });
-        }
-
-        if (password.length < 6) {
-            return res.status(400).json({ error: 'Password must be at least 6 characters' });
-        }
+        const { email, username, password, role = 'BUYER' } = req.body;
 
         // Check if user already exists
         const existingUser = await query(
@@ -86,20 +90,23 @@ router.post('/register', async (req: Request, res: Response) => {
             message: 'User registered successfully. Please check your email to verify your account.',
             user: result
         });
+
+        // Audit successful registration
+        await auditAuth.register(req, result.id, true);
     } catch (error) {
         console.error('Registration error:', error);
+
+        // Audit failed registration
+        await auditAuth.register(req, req.body.email || '', false, error instanceof Error ? error.message : 'Registration failed');
+
         res.status(500).json({ error: 'Registration failed' });
     }
 });
 
 // Login user
-router.post('/login', async (req: Request, res: Response) => {
+router.post('/login', authLimiter, validateBody(loginSchema), async (req: Request, res: Response) => {
     try {
         const { email, password } = req.body;
-
-        if (!email || !password) {
-            return res.status(400).json({ error: 'Email and password are required' });
-        }
 
         // Get user
         const result = await query(`
@@ -110,6 +117,7 @@ router.post('/login', async (req: Request, res: Response) => {
         `, [email]);
 
         if (result.rows.length === 0) {
+            await auditAuth.login(req, false, 'Invalid credentials - user not found');
             return res.status(401).json({ error: 'Invalid credentials' });
         }
 
@@ -118,6 +126,7 @@ router.post('/login', async (req: Request, res: Response) => {
         // Verify password
         const isValidPassword = await bcrypt.compare(password, user.password);
         if (!isValidPassword) {
+            await auditAuth.login(req, false, 'Invalid credentials - wrong password');
             return res.status(401).json({ error: 'Invalid credentials' });
         }
 
@@ -127,8 +136,8 @@ router.post('/login', async (req: Request, res: Response) => {
             [user.id]
         );
 
-        // Generate JWT token
-        const token = generateToken({
+        // Generate JWT tokens using new service
+        const tokens = await TokenService.generateTokenPair({
             userId: user.id,
             email: user.email,
             role: user.role
@@ -137,13 +146,21 @@ router.post('/login', async (req: Request, res: Response) => {
         // Remove password from response
         delete user.password;
 
+        // Audit successful login
+        await auditAuth.login(req, true);
+
         res.json({
             message: 'Login successful',
-            token,
+            accessToken: tokens.accessToken,
+            refreshToken: tokens.refreshToken,
             user
         });
     } catch (error) {
         console.error('Login error:', error);
+
+        // Audit failed login
+        await auditAuth.login(req, false, error instanceof Error ? error.message : 'Login failed');
+
         res.status(500).json({ error: 'Login failed' });
     }
 });
@@ -186,7 +203,7 @@ router.post('/verify-email', async (req: Request, res: Response) => {
 });
 
 // Forgot password
-router.post('/forgot-password', async (req: Request, res: Response) => {
+router.post('/forgot-password', passwordResetLimiter, validateBody(forgotPasswordSchema), async (req: Request, res: Response) => {
     try {
         const { email } = req.body;
 
@@ -228,7 +245,7 @@ router.post('/forgot-password', async (req: Request, res: Response) => {
 });
 
 // Reset password
-router.post('/reset-password', async (req: Request, res: Response) => {
+router.post('/reset-password', passwordResetLimiter, validateBody(resetPasswordSchema), async (req: Request, res: Response) => {
     try {
         const { token, password } = req.body;
 
@@ -274,18 +291,10 @@ router.post('/reset-password', async (req: Request, res: Response) => {
 });
 
 // Change password (authenticated)
-router.post('/change-password', authenticateToken, async (req: Request, res: Response) => {
+router.post('/change-password', authenticateToken, validateBody(changePasswordSchema), async (req: Request, res: Response) => {
     try {
         const { currentPassword, newPassword } = req.body;
         const userId = req.user?.id;
-
-        if (!currentPassword || !newPassword) {
-            return res.status(400).json({ error: 'Current and new passwords are required' });
-        }
-
-        if (newPassword.length < 6) {
-            return res.status(400).json({ error: 'New password must be at least 6 characters' });
-        }
 
         // Get current password
         const user = await query(
@@ -300,6 +309,7 @@ router.post('/change-password', authenticateToken, async (req: Request, res: Res
         // Verify current password
         const isValidPassword = await bcrypt.compare(currentPassword, user.rows[0].password);
         if (!isValidPassword) {
+            await auditAuth.passwordChange(req, false, 'Current password is incorrect');
             return res.status(401).json({ error: 'Current password is incorrect' });
         }
 
@@ -312,9 +322,21 @@ router.post('/change-password', authenticateToken, async (req: Request, res: Res
             [hashedPassword, userId]
         );
 
+        // Revoke all existing refresh tokens for security
+        if (userId) {
+            await TokenService.revokeAllUserTokens(userId);
+        }
+
+        // Audit successful password change
+        await auditAuth.passwordChange(req, true);
+
         res.json({ message: 'Password changed successfully' });
     } catch (error) {
         console.error('Change password error:', error);
+
+        // Audit failed password change
+        await auditAuth.passwordChange(req, false, error instanceof Error ? error.message : 'Password change failed');
+
         res.status(500).json({ error: 'Password change failed' });
     }
 });
@@ -349,7 +371,7 @@ router.get('/me', authenticateToken, async (req: Request, res: Response) => {
 });
 
 // Update user profile
-router.put('/profile', authenticateToken, async (req: Request, res: Response) => {
+router.put('/profile', authenticateToken, validateBody(updateProfileSchema), async (req: Request, res: Response) => {
     try {
         const userId = req.user?.id;
         const {
@@ -402,6 +424,28 @@ router.post('/logout', async (req: Request, res: Response) => {
     } catch (error) {
         console.error('Logout error:', error);
         res.status(500).json({ error: 'Logout failed' });
+    }
+});
+
+// Refresh token endpoint
+router.post('/refresh', validateBody(refreshTokenSchema), async (req: Request, res: Response) => {
+    try {
+        const { refreshToken } = req.body;
+
+        const tokens = await TokenService.refreshTokens(refreshToken);
+
+        if (!tokens) {
+            return res.status(401).json({ error: 'Invalid or expired refresh token' });
+        }
+
+        res.json({
+            message: 'Tokens refreshed successfully',
+            accessToken: tokens.accessToken,
+            refreshToken: tokens.refreshToken
+        });
+    } catch (error) {
+        console.error('Token refresh error:', error);
+        res.status(500).json({ error: 'Token refresh failed' });
     }
 });
 

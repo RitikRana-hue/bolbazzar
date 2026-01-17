@@ -87,10 +87,17 @@ export default function AddressesPage() {
             setEditingAddress(null);
         } else {
             // Add new address
-            const { id, ...addressData } = formData;
             const newAddress: Address = {
                 id: Date.now().toString(),
-                ...addressData as Omit<Address, 'id'>
+                type: formData.type || 'home',
+                name: formData.name || '',
+                street: formData.street || '',
+                city: formData.city || '',
+                state: formData.state || '',
+                zipCode: formData.zipCode || '',
+                country: formData.country || 'United States',
+                phone: formData.phone,
+                isDefault: formData.isDefault || false
             };
             setAddresses([...addresses, newAddress]);
         }

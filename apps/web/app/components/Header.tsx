@@ -1,6 +1,6 @@
 'use client';
 
-import { useContext, useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import Link from 'next/link';
 import {
     Search,
@@ -21,28 +21,24 @@ import {
     Zap,
     Star
 } from 'lucide-react';
-import { AuthContext } from '../context/AuthContext';
+import { useAuthStore } from '@/lib/store/auth-store';
 import { categories } from '../data/categories';
 import ProfileDropdown from './ProfileDropdown';
 import { NotificationIcon } from './ui/NotificationBadge';
 
 export default function Header() {
-    const auth = useContext(AuthContext);
+    const { user, isAuthenticated, logout } = useAuthStore();
     const [isCategoryOpen, setCategoryOpen] = useState(false);
     const [isProfileOpen, setProfileOpen] = useState(false);
     const [isMobileMenuOpen, setMobileMenuOpen] = useState(false);
     const [searchQuery, setSearchQuery] = useState('');
     const profileDropdownRef = useRef<HTMLDivElement>(null);
 
-    // Get user from auth context
-    const user = auth?.user;
-    const isAuthenticated = !!user;
-
     // Type-safe property access with defaults
-    const userCartItems = user?.cartItems || 0;
-    const userNotifications = user?.notifications || 0;
-    const userRole = user?.role || 'buyer';
-    const userIsAdmin = user?.role === 'admin';
+    const userCartItems = 0; // TODO: Get from cart store
+    const userNotifications = 0; // TODO: Get from notifications store
+    const userRole = user?.role || 'BUYER';
+    const userIsAdmin = user?.role === 'ADMIN';
 
     const handleSearch = (e: React.FormEvent) => {
         e.preventDefault();
@@ -74,13 +70,13 @@ export default function Header() {
                 {/* Top Bar */}
                 <div className="flex justify-between items-center text-xs text-gray-600 py-2 border-b border-gray-100 bg-gradient-to-r from-gray-50 to-blue-50">
                     <div className="flex items-center gap-6">
-                        <span className="font-medium">Hi! {isAuthenticated ? (
+                        <span className="font-medium">Hi! {isAuthenticated && user ? (
                             <span className="text-blue-600">
                                 {user.firstName && user.lastName
                                     ? `${user.firstName} ${user.lastName}`
-                                    : user.name || user.email
+                                    : user.username || user.email
                                 }
-                                (<button onClick={auth?.logout} className="text-red-600 hover:underline font-medium">Logout</button>)
+                                (<button onClick={logout} className="text-red-600 hover:underline font-medium">Logout</button>)
                             </span>
                         ) : (
                             <><Link href="/login" className="text-blue-600 hover:underline font-medium">Sign in</Link> or <Link href="/signup" className="text-blue-600 hover:underline font-medium">register</Link></>
@@ -314,9 +310,6 @@ export default function Header() {
                     <Link href="/auctions" className="flex items-center gap-1.5 text-purple-600 hover:text-purple-700 font-medium px-4 py-2 rounded-lg bg-purple-50 hover:bg-purple-100 transition-all duration-200">
                         <Gavel size={14} /> Live Auctions
                     </Link>
-                    <Link href="/offers" className="flex items-center gap-1.5 text-orange-600 hover:text-orange-700 font-medium px-4 py-2 rounded-lg bg-orange-50 hover:bg-orange-100 transition-all duration-200">
-                        <Zap size={14} /> Flash Sales
-                    </Link>
                 </div>
 
                 {/* Mobile Menu */}
@@ -324,12 +317,12 @@ export default function Header() {
                     <div className="md:hidden bg-white border-t border-gray-200 py-4">
                         <div className="space-y-4">
                             {/* User Section */}
-                            {isAuthenticated && (
+                            {isAuthenticated && user && (
                                 <div className="border-b border-gray-200 pb-4">
                                     <div className="flex items-center space-x-3 mb-3">
                                         <div className="w-10 h-10 bg-blue-600 rounded-full flex items-center justify-center">
                                             {user.avatar ? (
-                                                <img src={user.avatar} alt="Profile" className="w-10 h-10 rounded-full object-cover" />
+                                                <img src={user.avatar} alt={`${user.firstName || 'User'} avatar`} className="w-10 h-10 rounded-full object-cover" />
                                             ) : (
                                                 <User className="h-5 w-5 text-white" />
                                             )}
@@ -338,7 +331,7 @@ export default function Header() {
                                             <p className="font-medium text-gray-900">
                                                 {user.firstName && user.lastName
                                                     ? `${user.firstName} ${user.lastName}`
-                                                    : user.name || user.email
+                                                    : user.username || user.email
                                                 }
                                             </p>
                                             <p className="text-sm text-gray-500 capitalize">{userRole}</p>
@@ -385,10 +378,6 @@ export default function Header() {
                                         <Gavel className="h-4 w-4 mr-2" />
                                         Live Auctions
                                     </Link>
-                                    <Link href="/offers" className="flex items-center text-orange-600 hover:text-orange-700">
-                                        <Zap className="h-4 w-4 mr-2" />
-                                        Flash Sales
-                                    </Link>
                                     <Link href="/daily-deals" className="flex items-center text-green-600 hover:text-green-700">
                                         <Star className="h-4 w-4 mr-2" />
                                         Daily Deals
@@ -397,7 +386,7 @@ export default function Header() {
                             </div>
 
                             {/* Seller Tools */}
-                            {userRole === 'seller' && (
+                            {userRole === 'SELLER' && (
                                 <div className="border-t border-gray-200 pt-4">
                                     <h3 className="font-medium text-gray-900 mb-2">Seller Tools</h3>
                                     <div className="space-y-2 text-sm">

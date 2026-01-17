@@ -95,18 +95,34 @@ instasell-marketplace/
 
 ## 🚦 Getting Started
 
-### Prerequisites
+### Quick Development Setup
+
+```bash
+# Clone and setup
+git clone <repository-url>
+cd bolbazzar
+
+# Run automated setup
+./setup-dev.sh
+
+# Start development servers
+npm run dev
+```
+
+### Manual Setup
+
+#### Prerequisites
 - Node.js 18+ 
 - PostgreSQL 14+
 - Redis 6+
-- npm or yarn
+- npm
 
-### Environment Setup
+#### Environment Setup
 
 1. **Clone the repository**
 ```bash
 git clone <repository-url>
-cd instasell-marketplace
+cd bolbazzar
 ```
 
 2. **Install dependencies**
@@ -116,7 +132,7 @@ npm install
 
 3. **Set up environment variables**
 
-Copy `.env.example` to `.env` and configure:
+Copy `.env.example` to `apps/api/.env` and configure:
 
 ```env
 # Database
@@ -130,31 +146,26 @@ JWT_SECRET="your-super-secret-jwt-key"
 API_URL="http://localhost:3001"
 FRONTEND_URL="http://localhost:3000"
 
-# Payment
+# Payment (for testing)
 STRIPE_SECRET_KEY="sk_test_..."
 STRIPE_PUBLISHABLE_KEY="pk_test_..."
+```
 
-# Email
-SENDGRID_API_KEY="SG...."
-FROM_EMAIL="noreply@instasell.com"
-
-# File Upload
-AWS_ACCESS_KEY_ID="your-aws-key"
-AWS_SECRET_ACCESS_KEY="your-aws-secret"
-AWS_BUCKET_NAME="instasell-uploads"
-AWS_REGION="us-east-1"
-
-# Push Notifications
-FCM_SERVER_KEY="your-fcm-key"
+Create `apps/web/.env.local`:
+```env
+NEXT_PUBLIC_API_URL=http://localhost:3001
+NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY=pk_test_...
+NEXT_PUBLIC_SOCKET_URL=http://localhost:3001
 ```
 
 4. **Set up the database**
 ```bash
-# Run migrations
-npm run db:migrate
+# Run database setup script
+./setup-db.sh
 
-# Seed demo data
-npm run db:seed
+# Or manually:
+npm run migrate
+npm run seed
 ```
 
 5. **Start the development servers**
@@ -163,8 +174,8 @@ npm run db:seed
 npm run dev
 
 # Or start individually
-npm run dev:api    # Backend on :3001
-npm run dev:web    # Frontend on :3000
+npm run dev --workspace=apps/api    # Backend on :3001
+npm run dev --workspace=apps/web    # Frontend on :3000
 ```
 
 ## 📊 Database Schema
@@ -250,34 +261,40 @@ See individual route files for complete API documentation.
 
 ## 🚀 Deployment
 
-### Docker Deployment
+### Development
 ```bash
-# Build and run with Docker Compose
-docker-compose up -d
+# Quick setup
+./setup-dev.sh
+npm run dev
 ```
 
-### Manual Deployment
-1. Build the applications
+### Production
+
+#### Docker Deployment (Recommended)
 ```bash
+# Configure environment
+cp .env.production.example .env.production
+# Edit .env.production with your values
+
+# Deploy
+./deploy-production.sh
+```
+
+#### Manual Deployment
+```bash
+# Build for production
 npm run build
+
+# Start with PM2
+npm install -g pm2
+pm2 start ecosystem.config.js
 ```
 
-2. Set production environment variables
-
-3. Run database migrations
-```bash
-npm run db:migrate:prod
-```
-
-4. Start the production servers
-```bash
-npm run start
-```
+For detailed deployment instructions, see [DEPLOYMENT.md](DEPLOYMENT.md).
 
 ### Environment-specific Configurations
-- **Development** - Hot reload, debug logging
-- **Staging** - Production build, test data
-- **Production** - Optimized build, monitoring
+- **Development** - Hot reload, debug logging, mock services
+- **Production** - Optimized build, monitoring, security hardening
 
 ## 📈 Monitoring & Analytics
 

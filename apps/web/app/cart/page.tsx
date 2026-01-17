@@ -3,25 +3,22 @@
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { Trash2, Plus, Minus, Heart, ShoppingBag, Truck, Shield, ArrowRight } from 'lucide-react';
+import { cartApi, type CartItem as ApiCartItem } from '@/lib/api/cart';
+import { watchlistApi } from '@/lib/api/watchlist';
 
-interface CartItem {
-    id: string;
-    title: string;
-    price: number;
-    originalPrice?: number;
-    image: string;
-    seller: string;
-    quantity: number;
-    shipping: number;
-    condition: string;
-    inStock: boolean;
+interface CartItem extends ApiCartItem {
+    seller?: string;
+    condition?: string;
+    shipping?: number;
 }
 
 export default function CartPage() {
     const [cartItems, setCartItems] = useState<CartItem[]>([]);
     const [loading, setLoading] = useState(true);
+    const [error, setError] = useState<string | null>(null);
     const [promoCode, setPromoCode] = useState('');
     const [promoDiscount, setPromoDiscount] = useState(0);
+    const [actionLoading, setActionLoading] = useState<string | null>(null);
 
     useEffect(() => {
         fetchCartItems();
@@ -30,73 +27,63 @@ export default function CartPage() {
     const fetchCartItems = async () => {
         try {
             setLoading(true);
-            // Mock data - replace with actual API call
-            const mockItems: CartItem[] = [
-                {
-                    id: '1',
-                    title: 'iPhone 15 Pro Max 256GB - Natural Titanium',
-                    price: 1199.99,
-                    originalPrice: 1299.99,
-                    image: 'https://images.unsplash.com/photo-1601784551446-20c9e07cdbf1?w=300&h=300&fit=crop',
-                    seller: 'TechStore Pro',
-                    quantity: 1,
-                    shipping: 0,
-                    condition: 'New',
-                    inStock: true
-                },
-                {
-                    id: '2',
-                    title: 'Samsung Galaxy S24 Ultra 512GB',
-                    price: 999.99,
-                    image: 'https://images.unsplash.com/photo-1610945265064-0e34e5519bbf?w=300&h=300&fit=crop',
-                    seller: 'Galaxy Store',
-                    quantity: 1,
-                    shipping: 9.99,
-                    condition: 'New',
-                    inStock: true
-                },
-                {
-                    id: '3',
-                    title: 'Apple Watch Series 9 GPS 45mm',
-                    price: 329.99,
-                    originalPrice: 429.99,
-                    image: 'https://images.unsplash.com/photo-1434493789847-2f02dc6ca35d?w=300&h=300&fit=crop',
-                    seller: 'Apple Store',
-                    quantity: 2,
-                    shipping: 0,
-                    condition: 'New',
-                    inStock: false
-                }
-            ];
-
-            setCartItems(mockItems);
-            setLoading(false);
-        } catch (error) {
-            console.error('Failed to fetch cart items:', error);
+            setError(null);
+            const response = await cartApi.getCart();
+            setCartItems(response.cart.items as CartItem[]);
+        } catch (err: any) {
+            console.error('Failed to fetch cart items:', err);
+            setError(err.message || 'Failed to load cart');
+        } finally {
             setLoading(false);
         }
     };
 
-    const updateQuantity = (itemId: string, newQuantity: number) => {
+    const updateQuantity = async (itemId: string, newQuantity: number) => {
         if (newQuantity < 1) return;
-        setCartItems(prev =>
-            prev.map(item =>
-                item.id === itemId ? { ...item, quantity: newQuantity } : item
-            )
-        );
+
+        try {
+            setActionLoading(itemId);
+            await cartApi.updateItem(itemId, { quantity: newQuantity });
+            setCartItems(prev =>
+                prev.map(item =>
+                    item.id === itemId ? { ...item, quantity: newQuantity, total: item.currentPrice * newQuantity } : item
+                )
+            );
+        } catch (err: any) {
+            console.error('Failed to update quantity:', err);
+            alert(err.message || 'Failed to update quantity');
+        } finally {
+            setActionLoading(null);
+        }
     };
 
-    const removeItem = (itemId: string) => {
-        setCartItems(prev => prev.filter(item => item.id !== itemId));
+    const removeItem = async (itemId: string) => {
+        try {
+            setActionLoading(itemId);
+            await cartApi.removeItem(itemId);
+            setCartItems(prev => prev.filter(item => item.id !== itemId));
+        } catch (err: any) {
+            console.error('Failed to remove item:', err);
+            alert(err.message || 'Failed to remove item');
+        } finally {
+            setActionLoading(null);
+        }
     };
 
-    const moveToWatchlist = (itemId: string) => {
-        // Add to watchlist logic here
-        removeItem(itemId);
+    const moveToWatchlist = async (item: CartItem) => {
+        try {
+            setActionLoading(item.id);
+            await watchlistApi.addToWatchlist({ productId: item.productId });
+            await removeItem(item.id);
+        } catch (err: any) {
+            console.error('Failed to move to watchlist:', err);
+            alert(err.message || 'Failed to move to watchlist');
+            setActionLoading(null);
+        }
     };
 
     const applyPromoCode = () => {
-        // Mock promo code logic
+        // Mock promo code logic - replace with real API call
         if (promoCode.toLowerCase() === 'save10') {
             setPromoDiscount(0.10);
         } else if (promoCode.toLowerCase() === 'welcome20') {
@@ -107,16 +94,43 @@ export default function CartPage() {
         }
     };
 
-    const subtotal = cartItems.reduce((sum, item) => sum + (item.price * item.quantity), 0);
-    const totalShipping = cartItems.reduce((sum, item) => sum + item.shipping, 0);
+    const subtotal = cartItems.reduce((sum, item) => sum + item.total, 0);
+    const totalShipping = cartItems.reduce((sum, item) => sum + (item.shipping || 0), 0);
     const discountAmount = subtotal * promoDiscount;
     const total = subtotal + totalShipping - discountAmount;
 
     if (loading) {
         return (
-            <div className="flex items-center justify-center h-64">
-                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
-            </div>
+            <main className="bg-gray-50 py-8">
+                <div className="max-w-screen-xl mx-auto px-4">
+                    <div className="flex items-center justify-center h-64">
+                        <div className="text-center">
+                            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
+                            <p className="text-gray-600">Loading your cart...</p>
+                        </div>
+                    </div>
+                </div>
+            </main>
+        );
+    }
+
+    if (error) {
+        return (
+            <main className="bg-gray-50 py-8">
+                <div className="max-w-screen-xl mx-auto px-4">
+                    <div className="text-center py-16">
+                        <ShoppingBag className="h-16 w-16 text-red-300 mx-auto mb-4" />
+                        <h2 className="text-2xl font-bold text-gray-900 mb-2">Failed to load cart</h2>
+                        <p className="text-gray-600 mb-6">{error}</p>
+                        <button
+                            onClick={fetchCartItems}
+                            className="inline-flex items-center px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+                        >
+                            Try again
+                        </button>
+                    </div>
+                </div>
+            </main>
         );
     }
 
@@ -152,22 +166,26 @@ export default function CartPage() {
                                     {cartItems.map((item) => (
                                         <div key={item.id} className="flex items-start space-x-4 pb-6 border-b border-gray-200 last:border-b-0 last:pb-0">
                                             <img
-                                                src={item.image}
+                                                src={item.imageUrl}
                                                 alt={item.title}
                                                 className="w-24 h-24 object-cover rounded-lg"
+                                                onError={(e) => {
+                                                    const target = e.target as HTMLImageElement;
+                                                    target.src = 'https://images.unsplash.com/photo-1560472354-b33ff0c44a43?ixlib=rb-4.0.3&auto=format&fit=crop&w=300&q=80';
+                                                }}
                                             />
 
                                             <div className="flex-1">
                                                 <Link
-                                                    href={`/p/${item.id}`}
+                                                    href={`/p/${item.productId}`}
                                                     className="font-medium text-gray-900 hover:text-blue-600 line-clamp-2"
                                                 >
                                                     {item.title}
                                                 </Link>
-                                                <p className="text-sm text-gray-600 mt-1">by {item.seller}</p>
-                                                <p className="text-sm text-gray-600">Condition: {item.condition}</p>
+                                                {item.seller && <p className="text-sm text-gray-600 mt-1">by {item.seller}</p>}
+                                                {item.condition && <p className="text-sm text-gray-600">Condition: {item.condition}</p>}
 
-                                                {!item.inStock && (
+                                                {!item.isAvailable && (
                                                     <p className="text-sm text-red-600 font-medium mt-1">
                                                         Currently out of stock
                                                     </p>
@@ -175,18 +193,20 @@ export default function CartPage() {
 
                                                 <div className="flex items-center space-x-4 mt-3">
                                                     <button
-                                                        onClick={() => moveToWatchlist(item.id)}
-                                                        className="flex items-center text-sm text-gray-600 hover:text-blue-600"
+                                                        onClick={() => moveToWatchlist(item)}
+                                                        disabled={actionLoading === item.id}
+                                                        className="flex items-center text-sm text-gray-600 hover:text-blue-600 disabled:opacity-50"
                                                     >
                                                         <Heart className="h-4 w-4 mr-1" />
                                                         Move to watchlist
                                                     </button>
                                                     <button
                                                         onClick={() => removeItem(item.id)}
-                                                        className="flex items-center text-sm text-red-600 hover:text-red-700"
+                                                        disabled={actionLoading === item.id}
+                                                        className="flex items-center text-sm text-red-600 hover:text-red-700 disabled:opacity-50"
                                                     >
                                                         <Trash2 className="h-4 w-4 mr-1" />
-                                                        Remove
+                                                        {actionLoading === item.id ? 'Removing...' : 'Remove'}
                                                     </button>
                                                 </div>
                                             </div>
@@ -194,16 +214,16 @@ export default function CartPage() {
                                             <div className="text-right">
                                                 <div className="flex items-center space-x-2 mb-2">
                                                     <span className="text-lg font-bold text-gray-900">
-                                                        ${item.price.toFixed(2)}
+                                                        ${item.currentPrice.toFixed(2)}
                                                     </span>
-                                                    {item.originalPrice && (
+                                                    {item.price !== item.currentPrice && (
                                                         <span className="text-sm text-gray-500 line-through">
-                                                            ${item.originalPrice.toFixed(2)}
+                                                            ${item.price.toFixed(2)}
                                                         </span>
                                                     )}
                                                 </div>
 
-                                                {item.shipping > 0 && (
+                                                {item.shipping && item.shipping > 0 && (
                                                     <p className="text-sm text-gray-600 mb-2">
                                                         + ${item.shipping.toFixed(2)} shipping
                                                     </p>
@@ -213,7 +233,7 @@ export default function CartPage() {
                                                     <button
                                                         onClick={() => updateQuantity(item.id, item.quantity - 1)}
                                                         className="p-2 hover:bg-gray-50 disabled:opacity-50"
-                                                        disabled={item.quantity <= 1}
+                                                        disabled={item.quantity <= 1 || actionLoading === item.id}
                                                     >
                                                         <Minus className="h-4 w-4" />
                                                     </button>
@@ -222,7 +242,8 @@ export default function CartPage() {
                                                     </span>
                                                     <button
                                                         onClick={() => updateQuantity(item.id, item.quantity + 1)}
-                                                        className="p-2 hover:bg-gray-50"
+                                                        className="p-2 hover:bg-gray-50 disabled:opacity-50"
+                                                        disabled={actionLoading === item.id}
                                                     >
                                                         <Plus className="h-4 w-4" />
                                                     </button>

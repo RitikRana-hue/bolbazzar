@@ -1,9 +1,9 @@
 'use client';
 
-import { useContext } from 'react';
+import { useEffect } from 'react';
 import Link from 'next/link';
-import { usePathname } from 'next/navigation';
-import { AuthContext } from '../context/AuthContext';
+import { usePathname, useRouter } from 'next/navigation';
+import { useAuthStore } from '@/lib/store/auth-store';
 import {
     User,
     Package,
@@ -26,9 +26,35 @@ import {
 } from 'lucide-react';
 
 export default function AccountLayout({ children }: { children: React.ReactNode }) {
-    const auth = useContext(AuthContext);
+    const { user, isAuthenticated, isLoading } = useAuthStore();
     const pathname = usePathname();
-    const user = auth?.user;
+    const router = useRouter();
+
+    // Protect route - redirect to login if not authenticated
+    useEffect(() => {
+        if (!isLoading && !isAuthenticated) {
+            // Store intended destination for redirect after login
+            const returnUrl = encodeURIComponent(pathname);
+            router.push(`/login?returnUrl=${returnUrl}`);
+        }
+    }, [isAuthenticated, isLoading, pathname, router]);
+
+    // Show loading state while checking auth
+    if (isLoading) {
+        return (
+            <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+                <div className="text-center">
+                    <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
+                    <p className="mt-4 text-gray-600">Loading...</p>
+                </div>
+            </div>
+        );
+    }
+
+    // Don't render content if not authenticated
+    if (!isAuthenticated || !user) {
+        return null;
+    }
 
     const navigation = [
         {
@@ -150,7 +176,7 @@ export default function AccountLayout({ children }: { children: React.ReactNode 
         }
     ];
 
-    const isSeller = user?.role === 'seller' || user?.role === 'admin';
+    const isSeller = user?.role === 'SELLER' || user?.role === 'ADMIN';
 
     return (
         <div className="min-h-screen bg-gray-50">
@@ -172,14 +198,14 @@ export default function AccountLayout({ children }: { children: React.ReactNode 
                                     <p className="text-sm font-semibold text-gray-900 truncate">
                                         {user?.firstName && user?.lastName
                                             ? `${user.firstName} ${user.lastName}`
-                                            : user?.name || user?.email || 'User'
+                                            : user?.username || user?.email || 'User'
                                         }
                                     </p>
                                     <p className="text-xs text-gray-500 truncate">{user?.email}</p>
                                     <div className="flex items-center mt-1">
-                                        <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium capitalize ${user?.role === 'admin' ? 'bg-red-100 text-red-800' :
-                                                user?.role === 'seller' ? 'bg-green-100 text-green-800' :
-                                                    'bg-blue-100 text-blue-800'
+                                        <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium capitalize ${user?.role === 'ADMIN' ? 'bg-red-100 text-red-800' :
+                                            user?.role === 'SELLER' ? 'bg-green-100 text-green-800' :
+                                                'bg-blue-100 text-blue-800'
                                             }`}>
                                             {user?.role || 'buyer'}
                                         </span>
@@ -200,8 +226,8 @@ export default function AccountLayout({ children }: { children: React.ReactNode 
                                                 key={item.name}
                                                 href={item.href}
                                                 className={`group flex items-center px-3 py-2 text-sm font-medium rounded-lg transition-colors ${item.current
-                                                        ? 'bg-blue-50 text-blue-700 border border-blue-200'
-                                                        : 'text-gray-700 hover:bg-gray-50'
+                                                    ? 'bg-blue-50 text-blue-700 border border-blue-200'
+                                                    : 'text-gray-700 hover:bg-gray-50'
                                                     }`}
                                             >
                                                 <Icon className={`flex-shrink-0 -ml-1 mr-3 h-4 w-4 ${item.current ? 'text-blue-500' : 'text-gray-400 group-hover:text-gray-500'
@@ -225,8 +251,8 @@ export default function AccountLayout({ children }: { children: React.ReactNode 
                                                     key={item.name}
                                                     href={item.href}
                                                     className={`group flex items-center px-3 py-2 text-sm font-medium rounded-lg transition-colors ${item.current
-                                                            ? 'bg-green-50 text-green-700 border border-green-200'
-                                                            : 'text-gray-700 hover:bg-gray-50'
+                                                        ? 'bg-green-50 text-green-700 border border-green-200'
+                                                        : 'text-gray-700 hover:bg-gray-50'
                                                         }`}
                                                 >
                                                     <Icon className={`flex-shrink-0 -ml-1 mr-3 h-4 w-4 ${item.current ? 'text-green-500' : 'text-gray-400 group-hover:text-gray-500'

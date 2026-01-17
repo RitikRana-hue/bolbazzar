@@ -10,13 +10,20 @@
   "scripts": {
     "dev": "concurrently \"npm run dev --workspace=apps/api\" \"npm run dev --workspace=apps/web\"",
     "build": "npm run build --workspace=apps/api && npm run build --workspace=apps/web",
+    "start": "concurrently \"npm run start --workspace=apps/api\" \"npm run start --workspace=apps/web\"",
     "test": "npm run test --workspace=apps/api && npm run test --workspace=apps/web",
     "lint": "npm run lint --workspace=apps/api && npm run lint --workspace=apps/web",
     "seed": "npm run seed --workspace=apps/api",
+    "migrate": "npm run migrate --workspace=apps/api",
     "docker:build": "docker-compose build",
     "docker:up": "docker-compose up -d",
     "docker:down": "docker-compose down",
-    "docker:logs": "docker-compose logs -f"
+    "docker:logs": "docker-compose logs -f",
+    "prod:build": "docker-compose -f docker-compose.prod.yml build",
+    "prod:up": "docker-compose -f docker-compose.prod.yml up -d",
+    "prod:down": "docker-compose -f docker-compose.prod.yml down",
+    "prod:logs": "docker-compose -f docker-compose.prod.yml logs -f",
+    "health": "curl -f http://localhost:3001/health && curl -f http://localhost:3000"
   },
   "devDependencies": {
     "@types/bcryptjs": "^2.4.6",

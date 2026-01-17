@@ -67,9 +67,32 @@ const slides = [
     },
 ];
 
+interface SavedBid {
+    id: string;
+    auctionId: string;
+    productTitle: string;
+    productImage: string;
+    currentBid: number;
+    yourMaxBid: number;
+    isWinning: boolean;
+    auctionStatus: 'upcoming' | 'live' | 'ending-soon' | 'ended';
+    startTime: string;
+    endTime: string;
+    seller: string;
+    rating: number;
+    reviews: number;
+    category: string;
+    watchers: number;
+    totalBids: number;
+    estimatedValue: number;
+    condition: 'new' | 'used' | 'refurbished';
+}
+
 export default function Home() {
     const [currentSlide, setCurrentSlide] = useState(0);
     const [hotBids, setHotBids] = useState<any[]>([]);
+    const [savedBids, setSavedBids] = useState<SavedBid[]>([]);
+    const [currentTime, setCurrentTime] = useState(new Date());
 
     const nextSlide = () => {
         setCurrentSlide((prev) => (prev === slides.length - 1 ? 0 : prev + 1));
@@ -83,87 +106,203 @@ export default function Home() {
         setCurrentSlide(index);
     };
 
+    const getTimeRemaining = (endTime: string) => {
+        const end = new Date(endTime);
+        const diff = end.getTime() - currentTime.getTime();
+
+        if (diff <= 0) return 'Ended';
+
+        const days = Math.floor(diff / (1000 * 60 * 60 * 24));
+        const hours = Math.floor((diff % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
+        const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
+        const seconds = Math.floor((diff % (1000 * 60)) / 1000);
+
+        if (days > 0) return `${days}d ${hours}h`;
+        if (hours > 0) return `${hours}h ${minutes}m`;
+        return `${minutes}m ${seconds}s`;
+    };
+
+    const getTimeUntilStart = (startTime: string) => {
+        const start = new Date(startTime);
+        const diff = start.getTime() - currentTime.getTime();
+
+        if (diff <= 0) return null;
+
+        const days = Math.floor(diff / (1000 * 60 * 60 * 24));
+        const hours = Math.floor((diff % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
+        const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
+
+        if (days > 0) return `${days}d ${hours}h`;
+        if (hours > 0) return `${hours}h ${minutes}m`;
+        return `${minutes}m`;
+    };
+
     useEffect(() => {
         const slideInterval = setInterval(nextSlide, 5000);
+        const timer = setInterval(() => {
+            setCurrentTime(new Date());
+        }, 1000);
 
         const fetchHotBids = async () => {
             try {
-                // Mock data for hot bids with images and dynamic sizing - replace with actual API call
                 const mockHotBids = [
-                    {
-                        id: '1',
-                        name: 'iPhone 15 Pro Max 256GB',
-                        price: 1150.00,
-                        bids: 89,
-                        image: 'https://images.unsplash.com/photo-1511707171634-5f897ff02aa9?ixlib=rb-4.0.3&auto=format&fit=crop&w=400&q=80',
-                        size: 'large' // High bids = larger tile
-                    },
-                    {
-                        id: '2',
-                        name: 'MacBook Pro M3 14-inch',
-                        price: 2100.00,
-                        bids: 156,
-                        image: 'https://images.unsplash.com/photo-1496181133206-80ce9b88a853?ixlib=rb-4.0.3&auto=format&fit=crop&w=400&q=80',
-                        size: 'wide' // Very high bids = wide tile
-                    },
-                    {
-                        id: '3',
-                        name: 'Vintage Rolex Submariner',
-                        price: 8500.00,
-                        bids: 234,
-                        image: 'https://images.unsplash.com/photo-1523170335258-f5c6c6bd6eaf?ixlib=rb-4.0.3&auto=format&fit=crop&w=400&q=80',
-                        size: 'tall' // Premium item = tall tile
-                    },
-                    {
-                        id: '4',
-                        name: 'Nike Air Jordan 1 Chicago',
-                        price: 450.00,
-                        bids: 67,
-                        image: 'https://images.unsplash.com/photo-1542291026-7eec264c27ff?ixlib=rb-4.0.3&auto=format&fit=crop&w=400&q=80',
-                        size: 'medium'
-                    },
-                    {
-                        id: '5',
-                        name: 'Sony PlayStation 5',
-                        price: 399.00,
-                        bids: 123,
-                        image: 'https://images.unsplash.com/photo-1593640408182-31c70c8268f5?ixlib=rb-4.0.3&auto=format&fit=crop&w=400&q=80',
-                        size: 'wide'
-                    },
-                    {
-                        id: '6',
-                        name: 'Canon EOS R5 Camera',
-                        price: 2800.00,
-                        bids: 45,
-                        image: 'https://images.unsplash.com/photo-1606983340126-99ab4feaa64a?ixlib=rb-4.0.3&auto=format&fit=crop&w=400&q=80',
-                        size: 'small'
-                    },
-                    {
-                        id: '7',
-                        name: 'Apple Watch Ultra',
-                        price: 799.00,
-                        bids: 78,
-                        image: 'https://images.unsplash.com/photo-1434493789847-2f02dc6ca35d?ixlib=rb-4.0.3&auto=format&fit=crop&w=400&q=80',
-                        size: 'medium'
-                    },
-                    {
-                        id: '8',
-                        name: 'Gaming Setup Complete',
-                        price: 2499.00,
-                        bids: 198,
-                        image: 'https://images.unsplash.com/photo-1593640408182-31c70c8268f5?ixlib=rb-4.0.3&auto=format&fit=crop&w=400&q=80',
-                        size: 'large'
-                    }
+                    { id: '1', name: 'iPhone 15 Pro Max 256GB', price: 1150.00, bids: 89, image: 'https://images.unsplash.com/photo-1511707171634-5f897ff02aa9?ixlib=rb-4.0.3&auto=format&fit=crop&w=400&q=80', size: 'large' },
+                    { id: '2', name: 'MacBook Pro M3 14-inch', price: 2100.00, bids: 156, image: 'https://images.unsplash.com/photo-1496181133206-80ce9b88a853?ixlib=rb-4.0.3&auto=format&fit=crop&w=400&q=80', size: 'wide' },
+                    { id: '3', name: 'Vintage Rolex Submariner', price: 8500.00, bids: 234, image: 'https://images.unsplash.com/photo-1523170335258-f5c6c6bd6eaf?ixlib=rb-4.0.3&auto=format&fit=crop&w=400&q=80', size: 'tall' },
+                    { id: '4', name: 'Nike Air Jordan 1 Chicago', price: 450.00, bids: 67, image: 'https://images.unsplash.com/photo-1542291026-7eec264c27ff?ixlib=rb-4.0.3&auto=format&fit=crop&w=400&q=80', size: 'medium' },
+                    { id: '5', name: 'Sony PlayStation 5', price: 399.00, bids: 123, image: 'https://images.unsplash.com/photo-1593640408182-31c70c8268f5?ixlib=rb-4.0.3&auto=format&fit=crop&w=400&q=80', size: 'wide' },
+                    { id: '6', name: 'Canon EOS R5 Camera', price: 2800.00, bids: 45, image: 'https://images.unsplash.com/photo-1606983340126-99ab4feaa64a?ixlib=rb-4.0.3&auto=format&fit=crop&w=400&q=80', size: 'small' },
+                    { id: '7', name: 'Apple Watch Ultra', price: 799.00, bids: 78, image: 'https://images.unsplash.com/photo-1434493789847-2f02dc6ca35d?ixlib=rb-4.0.3&auto=format&fit=crop&w=400&q=80', size: 'medium' },
+                    { id: '8', name: 'Gaming Setup Complete', price: 2499.00, bids: 198, image: 'https://images.unsplash.com/photo-1593640408182-31c70c8268f5?ixlib=rb-4.0.3&auto=format&fit=crop&w=400&q=80', size: 'large' }
                 ];
                 setHotBids(mockHotBids);
             } catch (error) {
-                console.error('Failed to fetch hot bids:', error);
+                if (process.env.NODE_ENV === 'development') {
+                    console.error('Failed to fetch hot bids:', error);
+                }
+            }
+        };
+
+        const fetchSavedBids = async () => {
+            try {
+                // Mock data for saved bids - replace with actual API call
+                const mockSavedBids: SavedBid[] = [
+                    {
+                        id: '1',
+                        auctionId: 'AUC-001',
+                        productTitle: 'iPhone 15 Pro Max 256GB',
+                        productImage: 'https://images.unsplash.com/photo-1511707171634-5f897ff02aa9?ixlib=rb-4.0.3&auto=format&fit=crop&w=800&q=80',
+                        currentBid: 1150.00,
+                        yourMaxBid: 1200.00,
+                        isWinning: false,
+                        auctionStatus: 'live',
+                        startTime: '2024-12-15T10:00:00Z',
+                        endTime: '2024-12-18T20:00:00Z',
+                        seller: 'TechStore Pro',
+                        rating: 4.8,
+                        reviews: 1247,
+                        category: 'Electronics',
+                        watchers: 89,
+                        totalBids: 23,
+                        estimatedValue: 1299.99,
+                        condition: 'new'
+                    },
+                    {
+                        id: '2',
+                        auctionId: 'AUC-002',
+                        productTitle: 'MacBook Pro M3 14-inch',
+                        productImage: 'https://images.unsplash.com/photo-1496181133206-80ce9b88a853?ixlib=rb-4.0.3&auto=format&fit=crop&w=800&q=80',
+                        currentBid: 2100.00,
+                        yourMaxBid: 2200.00,
+                        isWinning: true,
+                        auctionStatus: 'ending-soon',
+                        startTime: '2024-12-16T14:00:00Z',
+                        endTime: '2024-12-18T18:30:00Z',
+                        seller: 'ElectroWorld',
+                        rating: 4.9,
+                        reviews: 634,
+                        category: 'Electronics',
+                        watchers: 156,
+                        totalBids: 45,
+                        estimatedValue: 2499.99,
+                        condition: 'new'
+                    },
+                    {
+                        id: '3',
+                        auctionId: 'AUC-003',
+                        productTitle: 'Vintage Rolex Submariner',
+                        productImage: 'https://images.unsplash.com/photo-1523170335258-f5c6c6bd6eaf?ixlib=rb-4.0.3&auto=format&fit=crop&w=800&q=80',
+                        currentBid: 8500.00,
+                        yourMaxBid: 9000.00,
+                        isWinning: true,
+                        auctionStatus: 'upcoming',
+                        startTime: '2024-12-19T12:00:00Z',
+                        endTime: '2024-12-22T18:00:00Z',
+                        seller: 'Luxury Watches',
+                        rating: 4.9,
+                        reviews: 89,
+                        category: 'Collectibles',
+                        watchers: 234,
+                        totalBids: 0,
+                        estimatedValue: 12000.00,
+                        condition: 'used'
+                    },
+                    {
+                        id: '4',
+                        auctionId: 'AUC-004',
+                        productTitle: 'Nike Air Jordan 1 Retro',
+                        productImage: 'https://images.unsplash.com/photo-1542291026-7eec264c27ff?ixlib=rb-4.0.3&auto=format&fit=crop&w=800&q=80',
+                        currentBid: 450.00,
+                        yourMaxBid: 500.00,
+                        isWinning: false,
+                        auctionStatus: 'live',
+                        startTime: '2024-12-17T09:00:00Z',
+                        endTime: '2024-12-20T21:00:00Z',
+                        seller: 'Sneaker Hub',
+                        rating: 4.7,
+                        reviews: 892,
+                        category: 'Fashion',
+                        watchers: 67,
+                        totalBids: 18,
+                        estimatedValue: 650.00,
+                        condition: 'new'
+                    },
+                    {
+                        id: '5',
+                        auctionId: 'AUC-005',
+                        productTitle: 'Canon EOS R5 Camera',
+                        productImage: 'https://images.unsplash.com/photo-1606983340126-99ab4feaa64a?ixlib=rb-4.0.3&auto=format&fit=crop&w=800&q=80',
+                        currentBid: 3200.00,
+                        yourMaxBid: 3500.00,
+                        isWinning: true,
+                        auctionStatus: 'live',
+                        startTime: '2024-12-16T08:00:00Z',
+                        endTime: '2024-12-19T16:00:00Z',
+                        seller: 'Camera World',
+                        rating: 4.8,
+                        reviews: 456,
+                        category: 'Electronics',
+                        watchers: 123,
+                        totalBids: 67,
+                        estimatedValue: 3999.99,
+                        condition: 'new'
+                    },
+                    {
+                        id: '6',
+                        auctionId: 'AUC-006',
+                        productTitle: 'Tesla Model S Plaid',
+                        productImage: 'https://images.unsplash.com/photo-1617788138017-80ad40651399?ixlib=rb-4.0.3&auto=format&fit=crop&w=800&q=80',
+                        currentBid: 85000.00,
+                        yourMaxBid: 90000.00,
+                        isWinning: false,
+                        auctionStatus: 'ending-soon',
+                        startTime: '2024-12-14T10:00:00Z',
+                        endTime: '2024-12-18T22:00:00Z',
+                        seller: 'Premium Motors',
+                        rating: 4.9,
+                        reviews: 234,
+                        category: 'Automotive',
+                        watchers: 567,
+                        totalBids: 156,
+                        estimatedValue: 120000.00,
+                        condition: 'used'
+                    }
+                ];
+                setSavedBids(mockSavedBids);
+            } catch (error) {
+                if (process.env.NODE_ENV === 'development') {
+                    console.error('Failed to fetch saved bids:', error);
+                }
             }
         };
 
         fetchHotBids();
+        fetchSavedBids();
 
-        return () => clearInterval(slideInterval);
+        return () => {
+            clearInterval(slideInterval);
+            clearInterval(timer);
+        };
     }, []);
 
     return (
@@ -290,80 +429,166 @@ export default function Home() {
 
 
 
-                {/* Professional Auction Navigation */}
-                <section className="grid grid-cols-2 md:grid-cols-4 gap-8 mb-16">
-                    <Link href="/auctions" className="group relative bg-white border border-gray-200 p-8 rounded-2xl transition-all duration-300 shadow-sm hover:shadow-xl hover:border-purple-200 overflow-hidden">
-                        <div className="absolute inset-0 bg-gradient-to-br from-purple-50 to-pink-50 opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
-                        <div className="relative z-10">
-                            <div className="w-14 h-14 bg-purple-100 rounded-xl mb-6 flex items-center justify-center group-hover:bg-purple-200 transition-colors duration-300">
-                                <Gavel className="h-7 w-7 text-purple-600" />
-                            </div>
-                            <h3 className="text-gray-900 font-semibold text-lg mb-3">Live Auctions</h3>
-                            <p className="text-gray-600 text-sm leading-relaxed mb-4">Participate in real-time bidding and secure exclusive items at competitive prices.</p>
-                            <div className="flex items-center justify-between">
-                                <span className="inline-flex items-center bg-red-100 text-red-700 px-2 py-1 rounded-md text-xs font-medium">
-                                    <div className="w-2 h-2 bg-red-500 rounded-full mr-1 animate-pulse"></div>
-                                    Live
-                                </span>
-                                <ChevronRight className="h-4 w-4 text-gray-400 group-hover:text-purple-600 transition-colors" />
-                            </div>
-                        </div>
-                    </Link>
 
-                    <Link href="/saved-bids" className="group relative bg-white border border-gray-200 p-8 rounded-2xl transition-all duration-300 shadow-sm hover:shadow-xl hover:border-blue-200 overflow-hidden">
-                        <div className="absolute inset-0 bg-gradient-to-br from-blue-50 to-indigo-50 opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
-                        <div className="relative z-10">
-                            <div className="w-14 h-14 bg-blue-100 rounded-xl mb-6 flex items-center justify-center group-hover:bg-blue-200 transition-colors duration-300">
-                                <Heart className="h-7 w-7 text-blue-600" />
-                            </div>
-                            <h3 className="text-gray-900 font-semibold text-lg mb-3">Saved Bids</h3>
-                            <p className="text-gray-600 text-sm leading-relaxed mb-4">Monitor your watchlist and receive notifications for items you're interested in.</p>
-                            <div className="flex items-center justify-between">
-                                <span className="inline-flex items-center bg-blue-100 text-blue-700 px-2 py-1 rounded-md text-xs font-medium">
-                                    Watchlist
-                                </span>
-                                <ChevronRight className="h-4 w-4 text-gray-400 group-hover:text-blue-600 transition-colors" />
-                            </div>
-                        </div>
-                    </Link>
 
-                    <Link href="/bid-history" className="group relative bg-white border border-gray-200 p-8 rounded-2xl transition-all duration-300 shadow-sm hover:shadow-xl hover:border-orange-200 overflow-hidden">
-                        <div className="absolute inset-0 bg-gradient-to-br from-orange-50 to-red-50 opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
-                        <div className="relative z-10">
-                            <div className="w-14 h-14 bg-orange-100 rounded-xl mb-6 flex items-center justify-center group-hover:bg-orange-200 transition-colors duration-300">
-                                <svg className="h-7 w-7 text-orange-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
-                                </svg>
+                {/* Nokia Lumia Style Saved Bids Grid */}
+                <section className="mb-16 bg-black p-8 rounded-none">
+                    <div className="flex items-center justify-between mb-8">
+                        <div>
+                            <h2 className="text-4xl font-light text-white mb-2 uppercase tracking-wider">your saved bids</h2>
+                            <p className="text-white/60 text-lg font-light">monitor your watchlist items</p>
+                        </div>
+                        <div className="flex items-center space-x-6">
+                            <div className="text-center">
+                                <div className="text-2xl font-light text-white">{savedBids.length}</div>
+                                <div className="text-white/60 text-xs uppercase tracking-wider">total</div>
                             </div>
-                            <h3 className="text-gray-900 font-semibold text-lg mb-3">Bid History</h3>
-                            <p className="text-gray-600 text-sm leading-relaxed mb-4">Access detailed analytics and insights from your previous bidding activities.</p>
-                            <div className="flex items-center justify-between">
-                                <span className="inline-flex items-center bg-orange-100 text-orange-700 px-2 py-1 rounded-md text-xs font-medium">
-                                    Analytics
-                                </span>
-                                <ChevronRight className="h-4 w-4 text-gray-400 group-hover:text-orange-600 transition-colors" />
+                            <div className="text-center">
+                                <div className="text-2xl font-light text-green-400">
+                                    {savedBids.filter(b => b.isWinning && b.auctionStatus !== 'upcoming').length}
+                                </div>
+                                <div className="text-white/60 text-xs uppercase tracking-wider">winning</div>
+                            </div>
+                            <div className="text-center">
+                                <div className="text-2xl font-light text-blue-400">
+                                    {savedBids.filter(b => b.auctionStatus === 'live').length}
+                                </div>
+                                <div className="text-white/60 text-xs uppercase tracking-wider">live</div>
                             </div>
                         </div>
-                    </Link>
+                    </div>
 
-                    <Link href="/sell" className="group relative bg-white border border-gray-200 p-8 rounded-2xl transition-all duration-300 shadow-sm hover:shadow-xl hover:border-emerald-200 overflow-hidden">
-                        <div className="absolute inset-0 bg-gradient-to-br from-emerald-50 to-teal-50 opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
-                        <div className="relative z-10">
-                            <div className="w-14 h-14 bg-emerald-100 rounded-xl mb-6 flex items-center justify-center group-hover:bg-emerald-200 transition-colors duration-300">
-                                <svg className="h-7 w-7 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
-                                </svg>
-                            </div>
-                            <h3 className="text-gray-900 font-semibold text-lg mb-3">Start Selling</h3>
-                            <p className="text-gray-600 text-sm leading-relaxed mb-4">Create professional listings and reach thousands of potential buyers worldwide.</p>
-                            <div className="flex items-center justify-between">
-                                <span className="inline-flex items-center bg-emerald-100 text-emerald-700 px-2 py-1 rounded-md text-xs font-medium">
-                                    List Items
-                                </span>
-                                <ChevronRight className="h-4 w-4 text-gray-400 group-hover:text-emerald-600 transition-colors" />
-                            </div>
-                        </div>
-                    </Link>
+                    {/* Metro Grid */}
+                    <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 gap-2">
+                        {savedBids.map((bid, index) => {
+                            // Create varied tile sizes for Metro effect
+                            const sizes = ['small', 'medium', 'wide', 'tall', 'large'];
+                            const sizeIndex = index % sizes.length;
+                            const size = sizes[sizeIndex];
+
+                            const sizeClasses = {
+                                small: 'aspect-square',
+                                medium: 'aspect-square',
+                                wide: 'col-span-2 aspect-[2/1]',
+                                tall: 'row-span-2 aspect-[1/2]',
+                                large: 'col-span-2 row-span-2'
+                            };
+
+                            const textSizes = {
+                                small: { title: 'text-sm', price: 'text-lg', padding: 'p-4' },
+                                medium: { title: 'text-base', price: 'text-xl', padding: 'p-4' },
+                                wide: { title: 'text-lg', price: 'text-2xl', padding: 'p-6' },
+                                tall: { title: 'text-base', price: 'text-xl', padding: 'p-4' },
+                                large: { title: 'text-2xl', price: 'text-4xl', padding: 'p-8' }
+                            };
+
+                            const currentSize = textSizes[size as keyof typeof textSizes];
+
+                            return (
+                                <Link
+                                    key={bid.id}
+                                    href={`/auctions/${bid.auctionId}`}
+                                    className={`${sizeClasses[size as keyof typeof sizeClasses]} ${currentSize.padding} relative overflow-hidden hover:scale-105 transition-all duration-300 group`}
+                                    style={{
+                                        backgroundImage: `url(${bid.productImage})`,
+                                        backgroundSize: 'cover',
+                                        backgroundPosition: 'center',
+                                        backgroundRepeat: 'no-repeat'
+                                    }}
+                                >
+                                    {/* Dark overlay for text readability */}
+                                    <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/50 to-black/30"></div>
+
+                                    {/* Hover overlay */}
+                                    <div className="absolute inset-0 bg-blue-600/20 opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
+
+                                    {/* Content */}
+                                    <div className="relative z-10 h-full flex flex-col justify-between text-white">
+                                        {/* Header with status */}
+                                        <div className="flex items-start justify-between">
+                                            <div className="bg-white/20 backdrop-blur-md p-2">
+                                                <Heart className={`${size === 'large' ? 'h-6 w-6' : 'h-4 w-4'} text-white fill-current`} />
+                                            </div>
+
+                                            {/* Status indicator */}
+                                            {bid.auctionStatus === 'live' && (
+                                                <div className="bg-green-500/90 backdrop-blur-md px-2 py-1 text-xs font-bold uppercase tracking-wider animate-pulse">
+                                                    LIVE
+                                                </div>
+                                            )}
+                                            {bid.auctionStatus === 'ending-soon' && (
+                                                <div className="bg-red-500/90 backdrop-blur-md px-2 py-1 text-xs font-bold uppercase tracking-wider animate-pulse">
+                                                    ENDING
+                                                </div>
+                                            )}
+                                            {bid.auctionStatus === 'upcoming' && (
+                                                <div className="bg-blue-500/90 backdrop-blur-md px-2 py-1 text-xs font-bold uppercase tracking-wider">
+                                                    UPCOMING
+                                                </div>
+                                            )}
+                                        </div>
+
+                                        {/* Title */}
+                                        <div className="flex-1 flex items-center">
+                                            <h3 className={`${currentSize.title} font-light line-clamp-2 text-white drop-shadow-lg uppercase tracking-wide`}>
+                                                {bid.productTitle}
+                                            </h3>
+                                        </div>
+
+                                        {/* Price and status */}
+                                        <div className="space-y-1">
+                                            <div className={`${currentSize.price} font-light text-white drop-shadow-lg`}>
+                                                ${bid.currentBid.toLocaleString()}
+                                            </div>
+
+                                            <div className="flex items-center justify-between">
+                                                <div className="text-xs text-white/80 uppercase tracking-wider font-light">
+                                                    {bid.auctionStatus === 'upcoming'
+                                                        ? `starts ${getTimeUntilStart(bid.startTime)}`
+                                                        : `ends ${getTimeRemaining(bid.endTime)}`
+                                                    }
+                                                </div>
+
+                                                {bid.isWinning && bid.auctionStatus !== 'upcoming' && (
+                                                    <div className="bg-yellow-500/90 backdrop-blur-md px-2 py-1 text-xs font-bold uppercase tracking-wider">
+                                                        WINNING
+                                                    </div>
+                                                )}
+                                            </div>
+
+                                            {/* Bid count */}
+                                            <div className="flex items-center space-x-2 text-xs text-white/60">
+                                                <Gavel className="h-3 w-3" />
+                                                <span>{bid.totalBids} bids</span>
+                                                <span className="ml-2">👁</span>
+                                                <span>{bid.watchers}</span>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    {/* Metro shine effect */}
+                                    <div className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-700">
+                                        <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent -translate-x-full group-hover:translate-x-full transition-transform duration-1000 ease-out"></div>
+                                    </div>
+
+                                    {/* High value border glow */}
+                                    {bid.currentBid > 5000 && (
+                                        <div className="absolute inset-0 border-2 border-yellow-400/50 opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
+                                    )}
+                                </Link>
+                            );
+                        })}
+                    </div>
+
+                    {/* View All Link */}
+                    <div className="text-center mt-8">
+                        <Link
+                            href="/saved-bids"
+                            className="inline-block bg-blue-600 text-white px-8 py-3 font-light uppercase tracking-wider hover:bg-blue-700 transition-colors"
+                        >
+                            view all saved bids
+                        </Link>
+                    </div>
                 </section>
 
                 {/* Modern Hot Bids Section */}
@@ -734,24 +959,27 @@ export default function Home() {
                 </section>
 
                 {/* Promotional Banners */}
-                <section className="bg-gradient-to-r from-orange-100 via-orange-50 to-yellow-100 p-10 flex justify-between items-center rounded-2xl mb-8 shadow-lg border border-orange-200 group hover:shadow-xl transition-all duration-300">
-                    <div className="flex items-center space-x-6">
+                <section className="bg-gradient-to-br from-black via-gray-900 to-black text-white p-10 flex justify-between items-center rounded-2xl mb-8 shadow-2xl relative overflow-hidden group">
+                    {/* Background Pattern */}
+                    <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/5 to-transparent animate-pulse"></div>
+
+                    <div className="relative z-10 flex items-center space-x-6">
                         <div className="w-20 h-20 bg-gradient-to-br from-orange-500 to-yellow-500 rounded-2xl flex items-center justify-center shadow-lg group-hover:scale-110 transition-transform duration-300">
                             <svg className="w-10 h-10 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v13m0-13V6a2 2 0 112 2h-2zm0 0V5.5A2.5 2.5 0 109.5 8H12zm-7 4h14M5 12a2 2 0 110-4h14a2 2 0 110 4M5 12v7a2 2 0 002 2h10a2 2 0 002-2v-7" />
                             </svg>
                         </div>
                         <div>
-                            <h2 className="text-3xl font-bold text-gray-900 mb-2">There's a deal for you, too</h2>
-                            <p className="text-gray-700 text-lg">Don't miss a chance to save on items you've been looking for.</p>
+                            <h2 className="text-3xl font-bold text-white mb-2">There's a deal for you, too</h2>
+                            <p className="text-gray-300 text-lg">Don't miss a chance to save on items you've been looking for.</p>
                         </div>
                     </div>
-                    <Link href="/daily-deals" className="bg-white font-semibold px-8 py-4 rounded-full border border-orange-300 hover:bg-orange-50 hover:border-orange-400 transition-all duration-300 shadow-lg hover:shadow-xl transform hover:scale-105">
-                        Explore Now
+                    <Link href="/daily-deals" className="relative z-10 bg-white text-black font-semibold px-8 py-4 rounded-full hover:bg-gray-100 transition-all duration-300 shadow-lg hover:shadow-xl transform hover:scale-105">
+                        Shop Now
                     </Link>
                 </section>
 
-                <section className="bg-gradient-to-r from-black via-gray-900 to-black text-white p-10 flex justify-between items-center rounded-2xl mb-8 shadow-2xl relative overflow-hidden group">
+                <section className="bg-gradient-to-br from-black via-gray-900 to-black text-white p-10 flex justify-between items-center rounded-2xl mb-8 shadow-2xl relative overflow-hidden group">
                     {/* Background Pattern */}
                     <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/5 to-transparent animate-pulse"></div>
 
@@ -762,7 +990,7 @@ export default function Home() {
                             </svg>
                         </div>
                         <div>
-                            <h2 className="text-3xl font-bold mb-2">Endless accessories. Epic prices.</h2>
+                            <h2 className="text-3xl font-bold text-white mb-2">Endless accessories. Epic prices.</h2>
                             <p className="text-gray-300 text-lg">Browse millions of upgrades for your ride.</p>
                         </div>
                     </div>

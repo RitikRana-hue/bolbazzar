@@ -8,7 +8,6 @@ export default function SitemapPage() {
             { name: 'Advanced Search', url: '/advanced-search' },
             { name: 'Daily Deals', url: '/daily-deals' },
             { name: 'Live Auctions', url: '/auctions' },
-            { name: 'Flash Sales', url: '/offers' },
             { name: 'Help Center', url: '/help' },
         ],
         'User Account': [

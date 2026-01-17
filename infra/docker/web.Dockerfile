@@ -6,14 +6,14 @@ WORKDIR /app
 RUN apk add --no-cache python3 make g++
 
 # Copy root package files
-COPY package.json yarn.lock ./
+COPY package*.json ./
 
 # Copy web app
 COPY apps/web ./apps/web
 
 # Install dependencies
-RUN yarn install --frozen-lockfile
+RUN npm ci
 
 EXPOSE 3000
 
-CMD ["yarn", "workspace", "web", "dev"]
+CMD ["npm", "run", "dev", "--workspace=apps/web"]

@@ -248,7 +248,7 @@ export default function OffersPage() {
         <div className="max-w-7xl mx-auto p-6">
             {/* Header */}
             <div className="mb-8">
-                <h1 className="text-3xl font-bold text-gray-900 mb-2">Offers & Flash Sales</h1>
+                <h1 className="text-3xl font-bold text-gray-900 mb-2">Special Offers & Deals</h1>
                 <p className="text-gray-600">
                     Limited time deals and special offers. Don't miss out on these amazing savings!
                 </p>
@@ -267,7 +267,6 @@ export default function OffersPage() {
                                 className="border border-gray-300 rounded-md px-3 py-2 text-sm"
                             >
                                 <option value="all">All Offers</option>
-                                <option value="flash_sale">Flash Sales</option>
                                 <option value="daily_deal">Daily Deals</option>
                                 <option value="clearance">Clearance</option>
                                 <option value="bundle">Bundles</option>

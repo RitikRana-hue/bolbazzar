@@ -226,7 +226,7 @@ function CreateListingContent() {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${localStorage.getItem('token')}`
+                    'Authorization': `Bearer ${localStorage.getItem('auth_token')}`
                 },
                 body: JSON.stringify(submitData)
             });
@@ -235,10 +235,10 @@ function CreateListingContent() {
                 const result = await response.json();
                 router.push(`/p/${result.product.id}?created=true`);
             } else {
-                const error = await response.json();
-                setErrors({ submit: error.message || 'Failed to create listing' });
+                const errorData = await response.json();
+                setErrors({ submit: errorData.message || 'Failed to create listing' });
             }
-        } catch (error) {
+        } catch (_error) {
             setErrors({ submit: 'Network error. Please try again.' });
         } finally {
             setLoading(false);
@@ -790,8 +790,8 @@ function CreateListingContent() {
                         {steps.map((step, index) => (
                             <div key={step.number} className="flex items-center">
                                 <div className={`flex items-center justify-center w-10 h-10 rounded-full border-2 ${currentStep >= step.number
-                                        ? 'bg-blue-600 border-blue-600 text-white'
-                                        : 'border-gray-300 text-gray-500'
+                                    ? 'bg-blue-600 border-blue-600 text-white'
+                                    : 'border-gray-300 text-gray-500'
                                     }`}>
                                     {currentStep > step.number ? (
                                         <CheckCircle className="h-6 w-6" />

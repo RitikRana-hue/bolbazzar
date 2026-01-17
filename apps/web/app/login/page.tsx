@@ -1,58 +1,41 @@
 'use client';
 
-import { useState, useContext } from 'react';
+import { useState, useEffect, Suspense } from 'react';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { Eye, EyeOff, Mail, Lock, ArrowRight, Gavel } from 'lucide-react';
-import { AuthContext } from '../context/AuthContext';
+import { useAuthStore } from '@/lib/store/auth-store';
 
-export default function LoginPage() {
+function LoginForm() {
     const [formData, setFormData] = useState({
         email: '',
         password: ''
     });
     const [showPassword, setShowPassword] = useState(false);
-    const [isLoading, setIsLoading] = useState(false);
     const [error, setError] = useState('');
 
-    const auth = useContext(AuthContext);
+    const { login, isLoading, isAuthenticated } = useAuthStore();
     const router = useRouter();
+    const searchParams = useSearchParams();
+    const returnUrl = searchParams.get('returnUrl');
+
+    // Redirect if already authenticated
+    useEffect(() => {
+        if (isAuthenticated) {
+            const destination = returnUrl ? decodeURIComponent(returnUrl) : '/account';
+            router.push(destination);
+        }
+    }, [isAuthenticated, router, returnUrl]);
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
-        setIsLoading(true);
         setError('');
 
         try {
-            const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/auth/login`, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify(formData),
-            });
-
-            const data = await response.json();
-
-            if (response.ok) {
-                // Store token and user data
-                localStorage.setItem('token', data.token);
-                localStorage.setItem('user', JSON.stringify(data.user));
-
-                // Update auth context
-                if (auth?.login) {
-                    auth.login(data.user, data.token);
-                }
-
-                // Redirect to dashboard or home
-                router.push('/account');
-            } else {
-                setError(data.error || 'Login failed');
-            }
-        } catch (error) {
-            setError('Network error. Please try again.');
-        } finally {
-            setIsLoading(false);
+            await login(formData.email, formData.password);
+            // Redirect handled by useEffect above
+        } catch (err: any) {
+            setError(err.message || 'Login failed. Please try again.');
         }
     };
 
@@ -232,5 +215,13 @@ export default function LoginPage() {
                 </div>
             </div>
         </div>
+    );
+}
+
+export default function LoginPage() {
+    return (
+        <Suspense fallback={<div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-indigo-50 flex items-center justify-center"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div></div>}>
+            <LoginForm />
+        </Suspense>
     );
 }

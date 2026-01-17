@@ -2,133 +2,63 @@
 
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
-import { Heart, Trash2, Share, Bell, Grid, List, Star } from 'lucide-react';
+import { Heart, Trash2, Bell, Grid, List, Star } from 'lucide-react';
+import { watchlistApi, type WatchlistItem } from '@/lib/api/watchlist';
 
-interface SavedItem {
-    id: string;
-    title: string;
-    price: number;
-    originalPrice?: number;
-    image: string;
-    seller: string;
-    rating: number;
-    reviews: number;
-    category: string;
+interface SavedItem extends WatchlistItem {
+    rating?: number;
+    reviews?: number;
     dateAdded: string;
     priceChange?: number;
     inStock: boolean;
+    originalPrice?: number;
 }
 
 export default function SavedPage() {
     const [savedItems, setSavedItems] = useState<SavedItem[]>([]);
     const [loading, setLoading] = useState(true);
+    const [error, setError] = useState<string | null>(null);
     const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
     const [sortBy, setSortBy] = useState('date-added');
     const [filterBy, setFilterBy] = useState('all');
+    const [page] = useState(1);
 
     useEffect(() => {
         fetchSavedItems();
-    }, []);
+    }, [page]);
 
     const fetchSavedItems = async () => {
         try {
             setLoading(true);
-            // Mock data - replace with actual API call
-            const mockItems: SavedItem[] = [
-                {
-                    id: '1',
-                    title: 'iPhone 15 Pro Max 256GB - Natural Titanium',
-                    price: 1199.99,
-                    originalPrice: 1299.99,
-                    image: 'https://images.unsplash.com/photo-1511707171634-5f897ff02aa9?ixlib=rb-4.0.3&auto=format&fit=crop&w=300&q=80',
-                    seller: 'TechStore Pro',
-                    rating: 4.8,
-                    reviews: 1247,
-                    category: 'Electronics',
-                    dateAdded: '2024-12-10',
-                    priceChange: -50.00,
-                    inStock: true
-                },
-                {
-                    id: '2',
-                    title: 'Nike Air Max 270 Sneakers',
-                    price: 89.99,
-                    originalPrice: 150.00,
-                    image: 'https://images.unsplash.com/photo-1542291026-7eec264c27ff?ixlib=rb-4.0.3&auto=format&fit=crop&w=300&q=80',
-                    seller: 'Sneaker Hub',
-                    rating: 4.7,
-                    reviews: 634,
-                    category: 'Fashion',
-                    dateAdded: '2024-12-08',
-                    priceChange: 10.00,
-                    inStock: true
-                },
-                {
-                    id: '3',
-                    title: 'Vintage Rolex Submariner',
-                    price: 8999.99,
-                    image: 'https://images.unsplash.com/photo-1523170335258-f5c6c6bd6eaf?ixlib=rb-4.0.3&auto=format&fit=crop&w=300&q=80',
-                    seller: 'Luxury Watches',
-                    rating: 4.9,
-                    reviews: 89,
-                    category: 'Collectibles',
-                    dateAdded: '2024-12-05',
-                    inStock: false
-                },
-                {
-                    id: '4',
-                    title: 'MacBook Pro M3 14-inch 512GB',
-                    price: 2199.99,
-                    originalPrice: 2499.99,
-                    image: 'https://images.unsplash.com/photo-1496181133206-80ce9b88a853?ixlib=rb-4.0.3&auto=format&fit=crop&w=300&q=80',
-                    seller: 'Apple Store',
-                    rating: 4.9,
-                    reviews: 892,
-                    category: 'Electronics',
-                    dateAdded: '2024-12-12',
-                    priceChange: -100.00,
-                    inStock: true
-                },
-                {
-                    id: '5',
-                    title: 'Sony WH-1000XM5 Headphones',
-                    price: 299.99,
-                    originalPrice: 399.99,
-                    image: 'https://images.unsplash.com/photo-1545454675-3531b543be5d?ixlib=rb-4.0.3&auto=format&fit=crop&w=300&q=80',
-                    seller: 'Audio Pro',
-                    rating: 4.6,
-                    reviews: 456,
-                    category: 'Electronics',
-                    dateAdded: '2024-12-11',
-                    priceChange: -25.00,
-                    inStock: true
-                },
-                {
-                    id: '6',
-                    title: 'Gaming Chair RGB LED',
-                    price: 249.99,
-                    originalPrice: 349.99,
-                    image: 'https://images.unsplash.com/photo-1586953208448-b95a79798f07?ixlib=rb-4.0.3&auto=format&fit=crop&w=300&q=80',
-                    seller: 'Gaming World',
-                    rating: 4.4,
-                    reviews: 234,
-                    category: 'Home & Garden',
-                    dateAdded: '2024-12-09',
-                    priceChange: 15.00,
-                    inStock: true
-                }
-            ];
+            setError(null);
+            const response = await watchlistApi.getWatchlist(page, 20);
 
-            setSavedItems(mockItems);
-            setLoading(false);
-        } catch (error) {
-            console.error('Failed to fetch saved items:', error);
+            // Map API response to SavedItem format
+            const items: SavedItem[] = response.watchlist.map(item => ({
+                ...item,
+                dateAdded: item.addedAt,
+                inStock: item.stock > 0,
+                rating: 4.5, // TODO: Get from product details
+                reviews: 100, // TODO: Get from product details
+            }));
+
+            setSavedItems(items);
+        } catch (err: any) {
+            console.error('Failed to fetch saved items:', err);
+            setError(err.message || 'Failed to load watchlist');
+        } finally {
             setLoading(false);
         }
     };
 
-    const removeFromSaved = (itemId: string) => {
-        setSavedItems(prev => prev.filter(item => item.id !== itemId));
+    const removeFromSaved = async (productId: string) => {
+        try {
+            await watchlistApi.removeFromWatchlist(productId);
+            setSavedItems(prev => prev.filter(item => item.productId !== productId));
+        } catch (err: any) {
+            console.error('Failed to remove from watchlist:', err);
+            alert(err.message || 'Failed to remove from watchlist');
+        }
     };
 
     const filteredItems = savedItems.filter(item => {
@@ -136,6 +66,7 @@ export default function SavedPage() {
         if (filterBy === 'electronics') return item.category.toLowerCase() === 'electronics';
         if (filterBy === 'fashion') return item.category.toLowerCase() === 'fashion';
         if (filterBy === 'collectibles') return item.category.toLowerCase() === 'collectibles';
+        if (filterBy === 'home') return item.category.toLowerCase() === 'home & garden';
         if (filterBy === 'price-drops') return item.priceChange && item.priceChange < 0;
         if (filterBy === 'out-of-stock') return !item.inStock;
         return true;
@@ -158,36 +89,91 @@ export default function SavedPage() {
 
     if (loading) {
         return (
-            <div className="flex items-center justify-center h-64">
-                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+            <div className="min-h-screen bg-gradient-to-br from-slate-50 via-purple-50 to-pink-50">
+                <div className="flex items-center justify-center h-64">
+                    <div className="text-center">
+                        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-purple-600 mx-auto mb-4"></div>
+                        <p className="text-gray-600">Loading your watchlist...</p>
+                    </div>
+                </div>
+            </div>
+        );
+    }
+
+    if (error) {
+        return (
+            <div className="min-h-screen bg-gradient-to-br from-slate-50 via-purple-50 to-pink-50">
+                <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
+                    <div className="text-center py-16">
+                        <Heart className="h-16 w-16 text-red-300 mx-auto mb-4" />
+                        <h2 className="text-2xl font-bold text-gray-900 mb-2">Failed to load watchlist</h2>
+                        <p className="text-gray-600 mb-6">{error}</p>
+                        <button
+                            onClick={fetchSavedItems}
+                            className="inline-flex items-center px-6 py-3 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors"
+                        >
+                            Try again
+                        </button>
+                    </div>
+                </div>
             </div>
         );
     }
 
     return (
-        <main className="bg-gray-50 py-8">
-            <div className="max-w-screen-xl mx-auto px-4">
-                {/* Header */}
-                <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-8">
-                    <div>
-                        <h1 className="text-3xl font-bold text-gray-900 mb-2">Saved Items</h1>
-                        <p className="text-gray-600">
-                            {savedItems.length} items • Get notified when prices drop
-                        </p>
-                    </div>
+        <div className="min-h-screen bg-gradient-to-br from-slate-50 via-purple-50 to-pink-50">
+            {/* Modern Hero Section */}
+            <div className="relative overflow-hidden bg-gradient-to-r from-purple-600 via-pink-600 to-red-600">
+                <div className="absolute inset-0 bg-black/20"></div>
 
-                    <div className="flex items-center space-x-4 mt-4 md:mt-0">
-                        <button className="flex items-center space-x-2 px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50">
-                            <Share size={16} />
-                            <span>Share list</span>
-                        </button>
-                        <button className="flex items-center space-x-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">
-                            <Bell size={16} />
-                            <span>Notification settings</span>
-                        </button>
-                    </div>
+                {/* Animated background elements */}
+                <div className="absolute top-0 left-0 w-full h-full overflow-hidden">
+                    <div className="absolute top-20 left-20 w-32 h-32 bg-white/10 rounded-full blur-xl animate-pulse"></div>
+                    <div className="absolute top-40 right-32 w-24 h-24 bg-white/5 rounded-full blur-lg animate-bounce"></div>
+                    <div className="absolute bottom-20 left-1/3 w-40 h-40 bg-white/5 rounded-full blur-2xl animate-pulse"></div>
                 </div>
 
+                <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16">
+                    <div className="text-center">
+                        <div className="inline-flex items-center px-4 py-2 bg-white/10 backdrop-blur-sm rounded-full text-white/90 text-sm font-medium mb-6">
+                            <Heart className="h-4 w-4 mr-2 text-pink-300" />
+                            Your Wishlist Collection
+                        </div>
+
+                        <h1 className="text-4xl lg:text-6xl font-bold text-white mb-6 leading-tight">
+                            <span className="bg-gradient-to-r from-white to-pink-100 bg-clip-text text-transparent">
+                                Saved Items
+                            </span>
+                        </h1>
+
+                        <p className="text-xl text-purple-100 mb-8 max-w-2xl mx-auto leading-relaxed">
+                            Keep track of your favorite items and get notified of price drops
+                        </p>
+
+                        {/* Stats */}
+                        <div className="flex justify-center space-x-8">
+                            <div className="text-center">
+                                <div className="text-3xl font-bold text-white">{savedItems.length}</div>
+                                <div className="text-purple-100 text-sm">Saved Items</div>
+                            </div>
+                            <div className="text-center">
+                                <div className="text-3xl font-bold text-white">
+                                    {savedItems.filter(item => item.priceChange && item.priceChange < 0).length}
+                                </div>
+                                <div className="text-purple-100 text-sm">Price Drops</div>
+                            </div>
+                            <div className="text-center">
+                                <div className="text-3xl font-bold text-white">
+                                    {savedItems.filter(item => item.inStock).length}
+                                </div>
+                                <div className="text-purple-100 text-sm">In Stock</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
                 {savedItems.length === 0 ? (
                     <div className="text-center py-16">
                         <Heart className="h-16 w-16 text-gray-300 mx-auto mb-4" />
@@ -205,48 +191,63 @@ export default function SavedPage() {
                 ) : (
                     <>
                         {/* Controls */}
-                        <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 space-y-4 md:space-y-0">
-                            <div className="flex items-center space-x-4">
-                                {/* Filter Dropdown */}
+                        <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between mb-8 space-y-4 lg:space-y-0">
+                            {/* Filter and Sort */}
+                            <div className="flex flex-wrap gap-4">
                                 <select
                                     value={filterBy}
                                     onChange={(e) => setFilterBy(e.target.value)}
-                                    className="border border-gray-300 rounded-lg px-3 py-2 bg-white text-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                    className="px-4 py-2 bg-white border border-gray-200 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-transparent"
                                 >
-                                    <option value="all">All items ({savedItems.length})</option>
+                                    <option value="all">All Categories ({savedItems.length})</option>
                                     <option value="electronics">Electronics ({savedItems.filter(i => i.category.toLowerCase() === 'electronics').length})</option>
                                     <option value="fashion">Fashion ({savedItems.filter(i => i.category.toLowerCase() === 'fashion').length})</option>
                                     <option value="collectibles">Collectibles ({savedItems.filter(i => i.category.toLowerCase() === 'collectibles').length})</option>
+                                    <option value="home">Home & Garden ({savedItems.filter(i => i.category.toLowerCase() === 'home & garden').length})</option>
                                     <option value="price-drops">Price drops ({savedItems.filter(i => i.priceChange && i.priceChange < 0).length})</option>
                                     <option value="out-of-stock">Out of stock ({savedItems.filter(i => !i.inStock).length})</option>
                                 </select>
 
-                                {/* Sort Dropdown */}
                                 <select
                                     value={sortBy}
                                     onChange={(e) => setSortBy(e.target.value)}
-                                    className="border border-gray-300 rounded-lg px-3 py-2 bg-white text-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                    className="px-4 py-2 bg-white border border-gray-200 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-transparent"
                                 >
-                                    <option value="date-added">Recently added</option>
+                                    <option value="date-added">Recently Added</option>
                                     <option value="price-low">Price: Low to High</option>
                                     <option value="price-high">Price: High to Low</option>
-                                    <option value="name">Name: A to Z</option>
+                                    <option value="name">Name A-Z</option>
                                 </select>
                             </div>
 
-                            {/* View Mode Toggle */}
-                            <div className="flex border border-gray-300 rounded-lg overflow-hidden">
-                                <button
-                                    onClick={() => setViewMode('grid')}
-                                    className={`p-2 ${viewMode === 'grid' ? 'bg-blue-600 text-white' : 'bg-white text-gray-600 hover:bg-gray-50'}`}
-                                >
-                                    <Grid size={20} />
-                                </button>
-                                <button
-                                    onClick={() => setViewMode('list')}
-                                    className={`p-2 ${viewMode === 'list' ? 'bg-blue-600 text-white' : 'bg-white text-gray-600 hover:bg-gray-50'}`}
-                                >
-                                    <List size={20} />
+                            {/* View Mode and Actions */}
+                            <div className="flex items-center space-x-4">
+                                <div className="flex bg-white rounded-xl p-1 border border-gray-200">
+                                    <button
+                                        onClick={() => setViewMode('grid')}
+                                        className={`flex items-center px-4 py-2 rounded-lg font-medium transition-colors ${viewMode === 'grid'
+                                            ? 'bg-purple-600 text-white'
+                                            : 'text-gray-600 hover:text-gray-900'
+                                            }`}
+                                    >
+                                        <Grid className="h-4 w-4 mr-2" />
+                                        Grid
+                                    </button>
+                                    <button
+                                        onClick={() => setViewMode('list')}
+                                        className={`flex items-center px-4 py-2 rounded-lg font-medium transition-colors ${viewMode === 'list'
+                                            ? 'bg-purple-600 text-white'
+                                            : 'text-gray-600 hover:text-gray-900'
+                                            }`}
+                                    >
+                                        <List className="h-4 w-4 mr-2" />
+                                        List
+                                    </button>
+                                </div>
+
+                                <button className="flex items-center space-x-2 px-4 py-2 bg-white border border-gray-200 rounded-xl text-gray-700 hover:bg-gray-50 transition-colors">
+                                    <Bell className="h-4 w-4" />
+                                    <span>Notifications</span>
                                 </button>
                             </div>
                         </div>
@@ -258,7 +259,7 @@ export default function SavedPage() {
                                     <div key={item.id} className="relative group bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden hover:shadow-lg transition-all duration-300">
                                         <div className="relative">
                                             <img
-                                                src={item.image}
+                                                src={item.imageUrl}
                                                 alt={item.title}
                                                 className="w-full h-48 object-cover group-hover:scale-105 transition-transform duration-300"
                                                 onError={(e) => {
@@ -270,7 +271,7 @@ export default function SavedPage() {
                                             {/* Saved Controls */}
                                             <div className="absolute top-3 right-3 flex space-x-1 opacity-0 group-hover:opacity-100 transition-opacity">
                                                 <button
-                                                    onClick={() => removeFromSaved(item.id)}
+                                                    onClick={() => removeFromSaved(item.productId)}
                                                     className="p-2 bg-white/90 backdrop-blur-sm rounded-full shadow-md hover:bg-red-50 text-red-600 hover:scale-110 transition-all duration-200"
                                                     title="Remove from saved"
                                                 >
@@ -300,7 +301,7 @@ export default function SavedPage() {
 
                                         <div className="p-4">
                                             <Link
-                                                href={`/p/${item.id}`}
+                                                href={`/p/${item.productId}`}
                                                 className="font-semibold text-gray-900 hover:text-blue-600 line-clamp-2 group-hover:text-blue-600 transition-colors mb-2 block"
                                             >
                                                 {item.title}
@@ -324,15 +325,17 @@ export default function SavedPage() {
 
                                             <div className="flex items-center justify-between text-sm text-gray-600">
                                                 <div className="flex items-center space-x-1">
-                                                    <div className="flex items-center">
-                                                        {[...Array(5)].map((_, i) => (
-                                                            <Star
-                                                                key={i}
-                                                                className={`h-3 w-3 ${i < Math.floor(item.rating) ? 'text-yellow-400 fill-current' : 'text-gray-300'}`}
-                                                            />
-                                                        ))}
-                                                    </div>
-                                                    <span>({item.reviews})</span>
+                                                    {item.rating && (
+                                                        <div className="flex items-center">
+                                                            {[...Array(5)].map((_, i) => (
+                                                                <Star
+                                                                    key={i}
+                                                                    className={`h-3 w-3 ${i < Math.floor(item.rating!) ? 'text-yellow-400 fill-current' : 'text-gray-300'}`}
+                                                                />
+                                                            ))}
+                                                        </div>
+                                                    )}
+                                                    {item.reviews && <span>({item.reviews})</span>}
                                                 </div>
                                                 <span className="text-xs text-gray-500">
                                                     Saved {new Date(item.dateAdded).toLocaleDateString()}
@@ -348,28 +351,34 @@ export default function SavedPage() {
                                     <div key={item.id} className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
                                         <div className="flex items-center space-x-6">
                                             <img
-                                                src={item.image}
+                                                src={item.imageUrl}
                                                 alt={item.title}
                                                 className="w-24 h-24 object-cover rounded-lg"
+                                                onError={(e) => {
+                                                    const target = e.target as HTMLImageElement;
+                                                    target.src = 'https://images.unsplash.com/photo-1560472354-b33ff0c44a43?ixlib=rb-4.0.3&auto=format&fit=crop&w=300&q=80';
+                                                }}
                                             />
                                             <div className="flex-1">
                                                 <Link
-                                                    href={`/p/${item.id}`}
+                                                    href={`/p/${item.productId}`}
                                                     className="font-medium text-gray-900 hover:text-blue-600 line-clamp-2"
                                                 >
                                                     {item.title}
                                                 </Link>
-                                                <p className="text-sm text-gray-600 mb-2">by {item.seller}</p>
+                                                <p className="text-sm text-gray-600 mb-2">by {item.seller.username}</p>
                                                 <div className="flex items-center space-x-2 mb-2">
-                                                    <div className="flex items-center">
-                                                        {[...Array(5)].map((_, i) => (
-                                                            <Star
-                                                                key={i}
-                                                                className={`h-4 w-4 ${i < Math.floor(item.rating) ? 'text-yellow-400 fill-current' : 'text-gray-300'}`}
-                                                            />
-                                                        ))}
-                                                    </div>
-                                                    <span className="text-sm text-gray-600">({item.reviews})</span>
+                                                    {item.rating && (
+                                                        <div className="flex items-center">
+                                                            {[...Array(5)].map((_, i) => (
+                                                                <Star
+                                                                    key={i}
+                                                                    className={`h-4 w-4 ${i < Math.floor(item.rating!) ? 'text-yellow-400 fill-current' : 'text-gray-300'}`}
+                                                                />
+                                                            ))}
+                                                        </div>
+                                                    )}
+                                                    {item.reviews && <span className="text-sm text-gray-600">({item.reviews})</span>}
                                                 </div>
                                                 <div className="flex items-center space-x-4 text-sm">
                                                     <span className="text-gray-500">Saved {new Date(item.dateAdded).toLocaleDateString()}</span>
@@ -394,7 +403,7 @@ export default function SavedPage() {
                                             </div>
                                             <div className="flex flex-col space-y-2">
                                                 <button
-                                                    onClick={() => removeFromSaved(item.id)}
+                                                    onClick={() => removeFromSaved(item.productId)}
                                                     className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
                                                     title="Remove from saved"
                                                 >
@@ -432,6 +441,6 @@ export default function SavedPage() {
                     </>
                 )}
             </div>
-        </main>
+        </div>
     );
 }

@@ -1,467 +1,417 @@
 import { Router, Request, Response } from 'express';
 import { PaymentService } from '../services/payment.service';
+import { ReconciliationService } from '../services/reconciliation.service';
+import { StripeService } from '../services/stripe.service';
 import { query } from '../db';
+import { authenticateToken } from '../middleware/auth';
+import { validateBody, validateParams } from '../middleware/validation';
+import { createPaymentIntentSchema, processPaymentSchema, idSchema } from '../validation/schemas';
+import { paymentLimiter } from '../middleware/rateLimiting';
+import { auditPayment } from '../middleware/auditLog';
+import crypto from 'crypto';
+import config from '../config';
 
 const router = Router();
 
-// Create payment intent for card payments
-router.post('/card/create-intent', async (req: Request, res: Response) => {
+// Apply authentication to all payment routes
+router.use(authenticateToken);
+
+// Create payment intent for order
+router.post('/create-intent', paymentLimiter, validateBody(createPaymentIntentSchema), async (req: Request, res: Response) => {
     try {
-        const { orderId, amount, currency = 'usd' } = req.body;
+        const { orderId, amount, currency = 'USD' } = req.body;
         const userId = req.user?.id;
 
-        // Verify order belongs to user
-        const order = await query(
-            'SELECT * FROM orders WHERE id = $1 AND buyer_id = $2',
-            [orderId, userId]
-        );
-
-        if (order.rows.length === 0) {
-            return res.status(404).json({ error: 'Order not found' });
+        if (!userId) {
+            return res.status(401).json({ error: 'Authentication required' });
         }
+
+        // Generate idempotency key from request
+        const idempotencyKey = req.headers['idempotency-key'] as string ||
+            crypto.createHash('sha256').update(`${userId}-${orderId}-${amount}`).digest('hex');
 
         const result = await PaymentService.createPaymentIntent(
             orderId,
             amount,
             currency,
-            userId
+            userId,
+            idempotencyKey
         );
 
-        res.json(result);
+        // Audit payment attempt
+        await auditPayment.paymentAttempt(req, orderId, amount, true);
+
+        res.json({
+            success: true,
+            ...result
+        });
+
     } catch (error) {
         console.error('Error creating payment intent:', error);
-        res.status(500).json({ error: 'Failed to create payment intent' });
+
+        // Audit failed payment attempt
+        await auditPayment.paymentAttempt(req, req.body.orderId, req.body.amount, false, error instanceof Error ? error.message : 'Failed to create payment intent');
+
+        res.status(500).json({
+            error: 'Failed to create payment intent',
+            message: error instanceof Error ? error.message : 'Unknown error'
+        });
     }
 });
 
-// Process UPI payment
-router.post('/upi/pay', async (req: Request, res: Response) => {
+export default router;
+// Confirm payment after successful client-side payment
+router.post('/confirm', paymentLimiter, async (req: Request, res: Response) => {
     try {
-        const { orderId, amount, upiId } = req.body;
+        const { paymentIntentId } = req.body;
         const userId = req.user?.id;
+
         if (!userId) {
             return res.status(401).json({ error: 'Authentication required' });
         }
 
-        // Verify order belongs to user
-        const order = await query(
-            'SELECT * FROM orders WHERE id = $1 AND buyer_id = $2',
-            [orderId, userId]
-        );
-
-        if (order.rows.length === 0) {
-            return res.status(404).json({ error: 'Order not found' });
+        if (!paymentIntentId) {
+            return res.status(400).json({ error: 'Payment intent ID is required' });
         }
 
-        const result = await PaymentService.processUPIPayment(
-            orderId,
-            amount,
-            upiId,
+        // Generate idempotency key for confirmation
+        const idempotencyKey = req.headers['idempotency-key'] as string ||
+            crypto.createHash('sha256').update(`confirm-${userId}-${paymentIntentId}`).digest('hex');
+
+        const result = await PaymentService.confirmPayment(
+            paymentIntentId,
+            idempotencyKey,
             userId
         );
 
         res.json(result);
+
     } catch (error) {
-        console.error('Error processing UPI payment:', error);
-        res.status(500).json({ error: 'Failed to process UPI payment' });
+        console.error('Error confirming payment:', error);
+        res.status(500).json({
+            error: 'Failed to confirm payment',
+            message: error instanceof Error ? error.message : 'Unknown error'
+        });
     }
 });
 
-// Process Net Banking payment
-router.post('/netbanking/pay', async (req: Request, res: Response) => {
+// Get payment status for order
+router.get('/status/:orderId', validateParams(idSchema), async (req: Request, res: Response) => {
     try {
-        const { orderId, amount, bankCode } = req.body;
-        const userId = req.user?.id;
-        if (!userId) {
-            return res.status(401).json({ error: 'Authentication required' });
-        }
-
-        // Verify order belongs to user
-        const order = await query(
-            'SELECT * FROM orders WHERE id = $1 AND buyer_id = $2',
-            [orderId, userId]
-        );
-
-        if (order.rows.length === 0) {
-            return res.status(404).json({ error: 'Order not found' });
-        }
-
-        const result = await PaymentService.processNetBankingPayment(
-            orderId,
-            amount,
-            bankCode,
-            userId
-        );
-
-        res.json(result);
-    } catch (error) {
-        console.error('Error processing net banking payment:', error);
-        res.status(500).json({ error: 'Failed to process net banking payment' });
-    }
-});
-
-// Wallet top-up
-router.post('/wallet/topup', async (req: Request, res: Response) => {
-    try {
-        const { amount, paymentMethod, paymentDetails } = req.body;
-        const userId = req.user?.id;
-        if (!userId) {
-            return res.status(401).json({ error: 'Authentication required' });
-        }
-
-        if (amount < 10) {
-            return res.status(400).json({ error: 'Minimum top-up amount is $10' });
-        }
-
-        const result = await PaymentService.topUpWallet(
-            userId,
-            amount,
-            paymentMethod,
-            paymentDetails
-        );
-
-        res.json(result);
-    } catch (error) {
-        console.error('Error topping up wallet:', error);
-        res.status(500).json({ error: 'Failed to top up wallet' });
-    }
-});
-
-// Gas wallet top-up (sellers only)
-router.post('/gas-wallet/topup', async (req: Request, res: Response) => {
-    try {
-        const { amount, paymentMethod, paymentDetails } = req.body;
-        const userId = req.user?.id;
-        if (!userId) {
-            return res.status(401).json({ error: 'Authentication required' });
-        }
-
-        // Verify user is a seller
-        const user = await query(
-            'SELECT role FROM users WHERE id = $1',
-            [userId]
-        );
-
-        if (user.rows.length === 0 || user.rows[0].role !== 'seller') {
-            return res.status(403).json({ error: 'Only sellers can top up gas wallet' });
-        }
-
-        if (amount < 5) {
-            return res.status(400).json({ error: 'Minimum gas wallet top-up is $5' });
-        }
-
-        const result = await PaymentService.topUpGasWallet(
-            userId,
-            amount,
-            paymentMethod,
-            paymentDetails
-        );
-
-        res.json(result);
-    } catch (error) {
-        console.error('Error topping up gas wallet:', error);
-        res.status(500).json({ error: 'Failed to top up gas wallet' });
-    }
-});
-
-// Get wallet balance
-router.get('/wallet/balance', async (req: Request, res: Response) => {
-    try {
+        const { orderId } = req.params;
         const userId = req.user?.id;
 
-        const wallet = await query(`
-            SELECT 
-                w.balance,
-                w.available_balance,
-                w.pending_withdrawal,
-                w.total_earned,
-                w.total_withdrawn,
-                gw.balance as gas_balance,
-                gw.total_topped_up as gas_total_topped_up,
-                gw.total_used as gas_total_used
-            FROM wallets w
-            LEFT JOIN gas_wallets gw ON gw.user_id = w.user_id
-            WHERE w.user_id = $1
-        `, [userId]);
+        // Verify user has access to this order
+        const orderResult = await query(`
+            SELECT id FROM orders 
+            WHERE id = $1 AND (buyerId = $2 OR sellerId = $2)
+        `, [orderId, userId]);
 
-        if (wallet.rows.length === 0) {
-            // Create wallet if doesn't exist
-            await query(`
-                INSERT INTO wallets (user_id, balance, available_balance, created_at)
-                VALUES ($1, 0, 0, NOW())
-            `, [userId]);
-
-            return res.json({
-                balance: 0,
-                available_balance: 0,
-                pending_withdrawal: 0,
-                total_earned: 0,
-                total_withdrawn: 0,
-                gas_balance: 0,
-                gas_total_topped_up: 0,
-                gas_total_used: 0
-            });
+        if (orderResult.rows.length === 0) {
+            return res.status(404).json({ error: 'Order not found or access denied' });
         }
 
-        res.json(wallet.rows[0]);
+        const status = await PaymentService.getPaymentStatus(orderId);
+        res.json(status);
+
     } catch (error) {
-        console.error('Error fetching wallet balance:', error);
-        res.status(500).json({ error: 'Failed to fetch wallet balance' });
-    }
-});
-
-// Get transaction logs
-router.get('/transactions', async (req: Request, res: Response) => {
-    try {
-        const userId = req.user?.id;
-        if (!userId) {
-            return res.status(401).json({ error: 'Authentication required' });
-        }
-        const { limit = 50, offset = 0, type } = req.query;
-
-        const transactions = await PaymentService.getTransactionLogs(
-            userId,
-            parseInt(limit as string),
-            parseInt(offset as string),
-            type as string
-        );
-
-        res.json(transactions);
-    } catch (error) {
-        console.error('Error fetching transaction logs:', error);
-        res.status(500).json({ error: 'Failed to fetch transaction logs' });
+        console.error('Error getting payment status:', error);
+        res.status(500).json({ error: 'Failed to get payment status' });
     }
 });
 
 // Process refund (admin only)
-router.post('/refund', async (req: Request, res: Response) => {
+router.post('/refund', paymentLimiter, async (req: Request, res: Response) => {
     try {
         const { orderId, amount, reason } = req.body;
-        const adminId = req.user?.id;
+        const userId = req.user?.id;
 
-        // Verify user is admin
-        const user = await query(
-            'SELECT role FROM users WHERE id = $1',
-            [adminId]
-        );
+        // Verify user is admin or seller of the order
+        const orderResult = await query(`
+            SELECT sellerId FROM orders WHERE id = $1
+        `, [orderId]);
 
-        if (user.rows.length === 0 || user.rows[0].role !== 'admin') {
-            return res.status(403).json({ error: 'Admin access required' });
+        if (orderResult.rows.length === 0) {
+            return res.status(404).json({ error: 'Order not found' });
+        }
+
+        const order = orderResult.rows[0];
+        const userResult = await query(`
+            SELECT role FROM users WHERE id = $1
+        `, [userId]);
+
+        const isAdmin = userResult.rows[0]?.role === 'admin';
+        const isSeller = order.sellerid === userId;
+
+        if (!isAdmin && !isSeller) {
+            return res.status(403).json({ error: 'Not authorized to process refunds for this order' });
         }
 
         const result = await PaymentService.processRefund(
             orderId,
             amount,
             reason,
-            adminId
+            userId
         );
+
+        // Audit refund
+        await auditPayment.refund(req, orderId, amount, true);
 
         res.json(result);
+
     } catch (error) {
         console.error('Error processing refund:', error);
-        res.status(500).json({ error: 'Failed to process refund' });
+
+        // Audit failed refund
+        await auditPayment.refund(req, req.body.orderId, req.body.amount, false, error instanceof Error ? error.message : 'Failed to process refund');
+
+        res.status(500).json({
+            error: 'Failed to process refund',
+            message: error instanceof Error ? error.message : 'Unknown error'
+        });
     }
 });
-
-// Auto-release payment on delivery
-router.post('/auto-release/:orderId', async (req: Request, res: Response) => {
+// Release escrow (seller or admin)
+router.post('/escrow/release/:orderId', validateParams(idSchema), async (req: Request, res: Response) => {
     try {
         const { orderId } = req.params;
+        const { reason = 'manual_release' } = req.body;
         const userId = req.user?.id;
 
-        // Verify user is buyer for this order
-        const order = await query(
-            'SELECT buyer_id FROM orders WHERE id = $1',
-            [orderId]
-        );
+        // Verify user is admin or seller of the order
+        const orderResult = await query(`
+            SELECT sellerId FROM orders WHERE id = $1
+        `, [orderId]);
 
-        if (order.rows.length === 0) {
+        if (orderResult.rows.length === 0) {
             return res.status(404).json({ error: 'Order not found' });
         }
 
-        if (order.rows[0].buyer_id !== userId) {
-            return res.status(403).json({ error: 'Access denied' });
+        const order = orderResult.rows[0];
+        const userResult = await query(`
+            SELECT role FROM users WHERE id = $1
+        `, [userId]);
+
+        const isAdmin = userResult.rows[0]?.role === 'admin';
+        const isSeller = order.sellerid === userId;
+
+        if (!isAdmin && !isSeller) {
+            return res.status(403).json({ error: 'Not authorized to release escrow for this order' });
         }
 
-        const result = await PaymentService.autoReleaseOnDelivery(orderId);
+        const result = await PaymentService.releaseEscrow(orderId, reason);
         res.json(result);
+
     } catch (error) {
-        console.error('Error auto-releasing payment:', error);
-        res.status(500).json({ error: 'Failed to auto-release payment' });
+        console.error('Error releasing escrow:', error);
+        res.status(500).json({
+            error: 'Failed to release escrow',
+            message: error instanceof Error ? error.message : 'Unknown error'
+        });
     }
 });
 
-// Get payment methods for user
-router.get('/methods', async (req: Request, res: Response) => {
+// Get seller wallet balance
+router.get('/wallet/balance', async (req: Request, res: Response) => {
     try {
         const userId = req.user?.id;
 
-        const methods = await query(`
+        const wallet = await query(`
             SELECT 
-                id, type, nickname, last4, brand, upi_id, 
-                bank_name, account_last4, is_default, is_verified,
-                created_at
-            FROM payment_methods 
-            WHERE user_id = $1 AND is_active = true
-            ORDER BY is_default DESC, created_at DESC
+                availableBalance,
+                pendingBalance,
+                totalEarned,
+                totalWithdrawn,
+                lastPayoutAt
+            FROM seller_wallets 
+            WHERE userId = $1
         `, [userId]);
 
-        res.json(methods.rows);
-    } catch (error) {
-        console.error('Error fetching payment methods:', error);
-        res.status(500).json({ error: 'Failed to fetch payment methods' });
-    }
-});
+        if (wallet.rows.length === 0) {
+            // Create wallet if doesn't exist
+            await query(`
+                INSERT INTO seller_wallets (userId, availableBalance, pendingBalance, totalEarned, totalWithdrawn)
+                VALUES ($1, 0, 0, 0, 0)
+            `, [userId]);
 
-// Add payment method
-router.post('/methods', async (req: Request, res: Response) => {
-    try {
-        const { type, nickname, cardDetails, upiId, bankDetails } = req.body;
-        const userId = req.user?.id;
-
-        let methodData: any = { type, nickname };
-
-        switch (type) {
-            case 'card':
-                if (!cardDetails) {
-                    return res.status(400).json({ error: 'Card details required' });
-                }
-                methodData = {
-                    ...methodData,
-                    last4: cardDetails.last4,
-                    brand: cardDetails.brand,
-                    exp_month: cardDetails.exp_month,
-                    exp_year: cardDetails.exp_year
-                };
-                break;
-
-            case 'upi':
-                if (!upiId) {
-                    return res.status(400).json({ error: 'UPI ID required' });
-                }
-                methodData.upi_id = upiId;
-                break;
-
-            case 'bank_account':
-                if (!bankDetails) {
-                    return res.status(400).json({ error: 'Bank details required' });
-                }
-                methodData = {
-                    ...methodData,
-                    bank_name: bankDetails.bank_name,
-                    account_last4: bankDetails.account_last4,
-                    account_type: bankDetails.account_type
-                };
-                break;
-
-            default:
-                return res.status(400).json({ error: 'Invalid payment method type' });
+            return res.json({
+                availableBalance: 0,
+                pendingBalance: 0,
+                totalEarned: 0,
+                totalWithdrawn: 0,
+                lastPayoutAt: null
+            });
         }
 
-        const method = await query(`
-            INSERT INTO payment_methods (
-                user_id, type, nickname, last4, brand, exp_month, exp_year,
-                upi_id, bank_name, account_last4, account_type, 
-                is_default, is_verified, created_at
-            )
-            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, false, false, NOW())
-            RETURNING *
-        `, [
-            userId, methodData.type, methodData.nickname, methodData.last4,
-            methodData.brand, methodData.exp_month, methodData.exp_year,
-            methodData.upi_id, methodData.bank_name, methodData.account_last4,
-            methodData.account_type
-        ]);
+        const walletData = wallet.rows[0];
+        res.json({
+            availableBalance: parseFloat(walletData.availablebalance),
+            pendingBalance: parseFloat(walletData.pendingbalance),
+            totalEarned: parseFloat(walletData.totalearned),
+            totalWithdrawn: parseFloat(walletData.totalwithdrawn),
+            lastPayoutAt: walletData.lastpayoutat
+        });
 
-        res.status(201).json(method.rows[0]);
     } catch (error) {
-        console.error('Error adding payment method:', error);
-        res.status(500).json({ error: 'Failed to add payment method' });
+        console.error('Error fetching wallet balance:', error);
+        res.status(500).json({ error: 'Failed to fetch wallet balance' });
     }
 });
-
-// Set default payment method
-router.put('/methods/:id/default', async (req: Request, res: Response) => {
+// Request withdrawal (sellers only)
+router.post('/wallet/withdraw', async (req: Request, res: Response) => {
     try {
-        const { id } = req.params;
+        const { amount, method = 'stripe_transfer' } = req.body;
         const userId = req.user?.id;
 
-        // Remove default from all methods
-        await query(`
-            UPDATE payment_methods 
-            SET is_default = false 
-            WHERE user_id = $1
+        if (!amount || amount <= 0) {
+            return res.status(400).json({ error: 'Valid withdrawal amount is required' });
+        }
+
+        // Verify user is a seller
+        const userResult = await query(`
+            SELECT role FROM users WHERE id = $1
         `, [userId]);
 
-        // Set new default
-        await query(`
-            UPDATE payment_methods 
-            SET is_default = true 
-            WHERE id = $1 AND user_id = $2
-        `, [id, userId]);
+        if (userResult.rows.length === 0 || userResult.rows[0].role !== 'seller') {
+            return res.status(403).json({ error: 'Only sellers can request withdrawals' });
+        }
 
-        res.json({ success: true });
+        // Check available balance
+        const walletResult = await query(`
+            SELECT availableBalance FROM seller_wallets WHERE userId = $1
+        `, [userId]);
+
+        if (walletResult.rows.length === 0 || parseFloat(walletResult.rows[0].availablebalance) < amount) {
+            return res.status(400).json({ error: 'Insufficient available balance' });
+        }
+
+        // Create withdrawal request
+        const withdrawalResult = await query(`
+            INSERT INTO withdrawal_requests (userId, amount, method, status)
+            VALUES ($1, $2, $3, 'pending')
+            RETURNING *
+        `, [userId, amount, method]);
+
+        // Update wallet balance
+        await query(`
+            UPDATE seller_wallets 
+            SET availableBalance = availableBalance - $1,
+                pendingBalance = pendingBalance + $1,
+                updatedAt = NOW()
+            WHERE userId = $2
+        `, [amount, userId]);
+
+        res.json({
+            success: true,
+            withdrawalId: withdrawalResult.rows[0].id,
+            message: 'Withdrawal request submitted successfully'
+        });
+
     } catch (error) {
-        console.error('Error setting default payment method:', error);
-        res.status(500).json({ error: 'Failed to set default payment method' });
+        console.error('Error requesting withdrawal:', error);
+        res.status(500).json({ error: 'Failed to request withdrawal' });
     }
 });
 
-// Delete payment method
-router.delete('/methods/:id', async (req: Request, res: Response) => {
+// Get transaction history
+router.get('/transactions', async (req: Request, res: Response) => {
     try {
-        const { id } = req.params;
         const userId = req.user?.id;
+        const { limit = 50, offset = 0, type } = req.query;
 
-        await query(`
-            UPDATE payment_methods 
-            SET is_active = false 
-            WHERE id = $1 AND user_id = $2
-        `, [id, userId]);
+        const transactions = await PaymentService.getTransactionHistory(
+            userId!,
+            parseInt(limit as string),
+            parseInt(offset as string),
+            type as string
+        );
 
-        res.json({ success: true });
+        res.json({ transactions });
+
     } catch (error) {
-        console.error('Error deleting payment method:', error);
-        res.status(500).json({ error: 'Failed to delete payment method' });
+        console.error('Error fetching transaction history:', error);
+        res.status(500).json({ error: 'Failed to fetch transaction history' });
     }
 });
-
-// Get supported banks for net banking
-router.get('/banks', async (req: Request, res: Response) => {
-    try {
-        const banks = [
-            { code: 'sbi', name: 'State Bank of India', logo: '/banks/sbi.png' },
-            { code: 'hdfc', name: 'HDFC Bank', logo: '/banks/hdfc.png' },
-            { code: 'icici', name: 'ICICI Bank', logo: '/banks/icici.png' },
-            { code: 'axis', name: 'Axis Bank', logo: '/banks/axis.png' },
-            { code: 'kotak', name: 'Kotak Mahindra Bank', logo: '/banks/kotak.png' },
-            { code: 'pnb', name: 'Punjab National Bank', logo: '/banks/pnb.png' },
-            { code: 'bob', name: 'Bank of Baroda', logo: '/banks/bob.png' },
-            { code: 'canara', name: 'Canara Bank', logo: '/banks/canara.png' }
-        ];
-
-        res.json(banks);
-    } catch (error) {
-        console.error('Error fetching banks:', error);
-        res.status(500).json({ error: 'Failed to fetch banks' });
-    }
-});
-
-// Webhook endpoint for payment status updates
+// Webhook endpoint for Stripe events
 router.post('/webhook', async (req: Request, res: Response) => {
     try {
-        const event = req.body;
+        const signature = req.headers['stripe-signature'] as string;
 
-        // Verify webhook signature (implement based on payment provider)
-        // For Stripe: stripe.webhooks.constructEvent(req.body, sig, endpointSecret)
+        if (!signature) {
+            return res.status(400).json({ error: 'Missing stripe-signature header' });
+        }
 
-        await PaymentService.handlePaymentWebhook(event);
+        // Construct webhook event
+        const event = StripeService.constructWebhookEvent(
+            req.body,
+            signature,
+            config.payment.stripe.webhookSecret!
+        );
+
+        // Handle the event
+        await PaymentService.handleWebhookEvent(event);
 
         res.json({ received: true });
+
     } catch (error) {
-        console.error('Error handling webhook:', error);
-        res.status(400).json({ error: 'Webhook error' });
+        console.error('Webhook error:', error);
+        res.status(400).json({
+            error: 'Webhook error',
+            message: error instanceof Error ? error.message : 'Unknown error'
+        });
     }
 });
 
-export default router;
+// Admin routes for reconciliation
+router.get('/admin/reconciliation/:date', async (req: Request, res: Response) => {
+    try {
+        const { date } = req.params;
+        const userId = req.user?.id;
+
+        // Verify user is admin
+        const userResult = await query(`
+            SELECT role FROM users WHERE id = $1
+        `, [userId]);
+
+        if (userResult.rows.length === 0 || userResult.rows[0].role !== 'admin') {
+            return res.status(403).json({ error: 'Admin access required' });
+        }
+
+        const report = await ReconciliationService.getReconciliationReport(date);
+
+        if (!report) {
+            return res.status(404).json({ error: 'Reconciliation report not found' });
+        }
+
+        res.json(report);
+
+    } catch (error) {
+        console.error('Error getting reconciliation report:', error);
+        res.status(500).json({ error: 'Failed to get reconciliation report' });
+    }
+});
+
+// Run reconciliation for a specific date (admin only)
+router.post('/admin/reconciliation/:date', async (req: Request, res: Response) => {
+    try {
+        const { date } = req.params;
+        const userId = req.user?.id;
+
+        // Verify user is admin
+        const userResult = await query(`
+            SELECT role FROM users WHERE id = $1
+        `, [userId]);
+
+        if (userResult.rows.length === 0 || userResult.rows[0].role !== 'admin') {
+            return res.status(403).json({ error: 'Admin access required' });
+        }
+
+        const report = await ReconciliationService.runDailyReconciliation(date);
+        res.json(report);
+
+    } catch (error) {
+        console.error('Error running reconciliation:', error);
+        res.status(500).json({ error: 'Failed to run reconciliation' });
+    }
+});

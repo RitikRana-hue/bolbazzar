@@ -17,7 +17,7 @@ interface User {
     id: string;
     name: string;
     email: string;
-    role: 'buyer' | 'seller' | 'admin';
+    role: 'BUYER' | 'SELLER' | 'ADMIN';
     status: 'active' | 'suspended' | 'pending_verification';
     avatar: string;
     joinedAt: string;
@@ -53,7 +53,7 @@ export default function AdminUsersPage() {
                     id: '1',
                     name: 'John Doe',
                     email: 'john.doe@email.com',
-                    role: 'buyer',
+                    role: 'BUYER',
                     status: 'active',
                     avatar: 'https://via.placeholder.com/40',
                     joinedAt: '2024-01-10T00:00:00Z',
@@ -66,7 +66,7 @@ export default function AdminUsersPage() {
                     id: '2',
                     name: 'TechStore Inc',
                     email: 'contact@techstore.com',
-                    role: 'seller',
+                    role: 'SELLER',
                     status: 'active',
                     avatar: 'https://via.placeholder.com/40',
                     joinedAt: '2023-12-01T00:00:00Z',
@@ -80,7 +80,7 @@ export default function AdminUsersPage() {
                     id: '3',
                     name: 'Jane Smith',
                     email: 'jane.smith@email.com',
-                    role: 'buyer',
+                    role: 'BUYER',
                     status: 'pending_verification',
                     avatar: 'https://via.placeholder.com/40',
                     joinedAt: '2024-01-14T00:00:00Z',
@@ -93,7 +93,7 @@ export default function AdminUsersPage() {
                     id: '4',
                     name: 'Mike Wilson',
                     email: 'mike.wilson@email.com',
-                    role: 'buyer',
+                    role: 'BUYER',
                     status: 'suspended',
                     avatar: 'https://via.placeholder.com/40',
                     joinedAt: '2024-01-05T00:00:00Z',
@@ -106,7 +106,7 @@ export default function AdminUsersPage() {
                     id: '5',
                     name: 'Admin User',
                     email: 'admin@instasell.com',
-                    role: 'admin',
+                    role: 'ADMIN',
                     status: 'active',
                     avatar: 'https://via.placeholder.com/40',
                     joinedAt: '2023-01-01T00:00:00Z',
@@ -359,7 +359,7 @@ export default function AdminUsersPage() {
                                             <div>{user.totalOrders} orders</div>
                                             <div className="flex items-center">
                                                 <DollarSign className="h-3 w-3 mr-1" />
-                                                {user.role === 'seller' && user.totalSales
+                                                {user.role === 'SELLER' && user.totalSales
                                                     ? `$${user.totalSales.toFixed(2)} sales`
                                                     : `$${user.totalSpent.toFixed(2)} spent`
                                                 }
@@ -449,10 +449,10 @@ export default function AdminUsersPage() {
                                 </div>
                                 <div className="bg-gray-50 p-4 rounded-lg">
                                     <p className="text-sm font-medium text-gray-700">
-                                        {selectedUser.role === 'seller' ? 'Total Sales' : 'Total Spent'}
+                                        {selectedUser.role === 'SELLER' ? 'Total Sales' : 'Total Spent'}
                                     </p>
                                     <p className="text-2xl font-bold text-gray-900">
-                                        ${selectedUser.role === 'seller' && selectedUser.totalSales
+                                        ${selectedUser.role === 'SELLER' && selectedUser.totalSales
                                             ? selectedUser.totalSales.toFixed(2)
                                             : selectedUser.totalSpent.toFixed(2)
                                         }
