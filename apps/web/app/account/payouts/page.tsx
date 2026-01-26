@@ -1,8 +1,0 @@
-export default function PayoutsPage() {
-    return (
-        <div>
-            <h1 className="text-2xl font-bold mb-4">Payouts</h1>
-            <p className="text-gray-600">You have no payout history.</p>
-        </div>
-    );
-}
