@@ -1,0 +1,398 @@
+'use client';
+
+import { useState, useEffect, useMemo } from 'react';
+import {
+    Clock,
+    Grid,
+    List,
+    Search,
+    Star
+} from 'lucide-react';
+import AuctionCard from '../components/ui/AuctionCard';
+
+interface Auction {
+    id: string;
+    productId: string;
+    title: string;
+    image: string;
+    startingPrice: number;
+    currentPrice: number;
+    reservePrice?: number;
+    endTime: string;
+    totalBids: number;
+    isReserveMet: boolean;
+    seller: {
+        name: string;
+        rating: number;
+    };
+    condition: string;
+    category: string;
+}
+
+interface ApiAuction {
+    id: string;
+    productId: string;
+    sellerId: string;
+    startingPrice: number;
+    reservePrice?: number;
+    currentPrice: number;
+    bidIncrement: number;
+    startTime: string;
+    endTime: string;
+    status: string;
+    totalBids: number;
+    winnerId?: string;
+    autoExtend: boolean;
+    extensionTime: number;
+    title?: string;
+    description?: string;
+    condition?: string;
+    categoryName?: string;
+    categorySlug?: string;
+    sellerName?: string;
+    sellerFirstName?: string;
+    sellerLastName?: string;
+    primaryImage?: string;
+    sellerRating?: number;
+    isReserveMet?: boolean;
+}
+
+export default function AuctionsPage() {
+    const [auctions, setAuctions] = useState<Auction[]>([]);
+    const [loading, setLoading] = useState(true);
+    const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
+    const [sortBy, setSortBy] = useState('ending_soon');
+    const [searchQuery, setSearchQuery] = useState('');
+    const [minPrice, setMinPrice] = useState(0);
+    const [maxPrice, setMaxPrice] = useState(100000);
+    const [condition, setCondition] = useState('all');
+    const [page] = useState(1);
+
+    const fetchAuctions = async () => {
+        try {
+            setLoading(true);
+
+            const response: PaginatedResponse<ApiAuction> = await auctionsApi.getAuctions({
+                search: searchQuery || undefined,
+                minPrice: minPrice > 0 ? minPrice : undefined,
+                maxPrice: maxPrice < 100000 ? maxPrice : undefined,
+                sortBy: sortBy === 'ending_soon' ? 'endTime' : sortBy === 'price_low' ? 'currentPrice' : sortBy === 'price_high' ? 'currentPrice' : undefined,
+                sortOrder: sortBy === 'price_high' ? 'DESC' : 'ASC',
+                endingSoon: sortBy === 'ending_soon' ? true : undefined,
+                page,
+                limit: 12
+            });
+
+            // Transform API response to match component interface
+            const transformedAuctions = response.data.map((auction: ApiAuction) => ({
+                id: auction.id,
+                productId: auction.productId,
+                title: auction.title || 'Untitled Auction',
+                image: auction.primaryImage || 'https://images.unsplash.com/photo-1560472354-b33ff0c44a43?ixlib=rb-4.0.3&auto=format&fit=crop&w=400&q=80',
+                startingPrice: parseFloat(auction.startingPrice.toString()),
+                currentPrice: parseFloat(auction.currentPrice.toString()),
+                reservePrice: auction.reservePrice ? parseFloat(auction.reservePrice.toString()) : undefined,
+                endTime: auction.endTime,
+                totalBids: auction.totalBids || 0,
+                isReserveMet: auction.isReserveMet || false,
+                seller: {
+                    name: auction.sellerName || 'Unknown Seller',
+                    rating: auction.sellerRating || 4.5
+                },
+                condition: auction.condition || 'Used',
+                category: auction.categoryName || 'Uncategorized'
+            }));
+
+            setAuctions(transformedAuctions);
+        } catch (err: any) {
+            console.error('Failed to fetch auctions:', err);
+            // Handle error silently for now
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    useEffect(() => {
+        fetchAuctions();
+
+        // Setup Socket.IO for real-time bid updates
+        socketClient.connect();
+
+        // Listen for bid updates on all auctions
+        socketClient.onNewBid((bidData: any) => {
+            setAuctions(prev => prev.map(auction =>
+                auction.id === bidData.auctionId
+                    ? {
+                        ...auction,
+                        currentPrice: bidData.amount,
+                        totalBids: (auction.totalBids || 0) + 1,
+                        isReserveMet: bidData.isReserveMet || auction.isReserveMet
+                    }
+                    : auction
+            ));
+        });
+
+        // Listen for auction end events
+        socketClient.onAuctionEnded((data: any) => {
+            setAuctions(prev => prev.filter(auction => auction.id !== data.auctionId));
+        });
+
+        return () => {
+            socketClient.off('new_bid');
+            socketClient.off('auction_ended');
+        };
+    }, [page, sortBy, searchQuery, minPrice, maxPrice, condition]);
+
+    // Memoized filtering and sorting for better performance
+    const sortedAuctions = useMemo(() => {
+        // Filter auctions based on search and filters
+        const filtered = auctions.filter(auction => {
+            const matchesSearch = auction.title.toLowerCase().includes(searchQuery.toLowerCase());
+            const matchesPrice = auction.currentPrice >= minPrice && auction.currentPrice <= maxPrice;
+            return matchesSearch && matchesPrice;
+        });
+
+        // Sort auctions
+        return [...filtered].sort((a, b) => {
+            switch (sortBy) {
+                case 'ending_soon':
+                    return new Date(a.endTime).getTime() - new Date(b.endTime).getTime();
+                case 'newest':
+                    return new Date(b.endTime).getTime() - new Date(a.endTime).getTime();
+                case 'price_low':
+                    return a.currentPrice - b.currentPrice;
+                case 'price_high':
+                    return b.currentPrice - a.currentPrice;
+                case 'most_bids':
+                    return b.totalBids - a.totalBids;
+                default:
+                    return 0;
+            }
+        });
+    }, [auctions, searchQuery, minPrice, maxPrice, sortBy]);
+
+    return (
+        <div className="min-h-screen bg-gradient-to-br from-purple-50 via-white to-blue-50">
+            {/* Hero Section */}
+            <div className="bg-gradient-to-r from-purple-600 via-blue-600 to-indigo-600 text-white">
+                <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16">
+                    <div className="text-center">
+                        <div className="flex items-center justify-center mb-6">
+                            <div className="w-16 h-16 bg-white/20 backdrop-blur-sm rounded-2xl flex items-center justify-center mr-4">
+                                <Clock className="h-8 w-8 text-white" />
+                            </div>
+                            <div>
+                                <h1 className="text-4xl lg:text-5xl font-bold mb-2">Live Auctions</h1>
+                                <p className="text-purple-100 text-lg">Find your perfect deal in real-time</p>
+                            </div>
+                        </div>
+
+                        {/* Stats */}
+                        <div className="flex justify-center space-x-8 mt-8">
+                            <div className="text-center">
+                                <div className="text-3xl font-bold">{sortedAuctions.length}</div>
+                                <div className="text-purple-100 text-sm">Active Auctions</div>
+                            </div>
+                            <div className="text-center">
+                                <div className="text-3xl font-bold">1,247</div>
+                                <div className="text-purple-100 text-sm">Bids Today</div>
+                            </div>
+                            <div className="text-center">
+                                <div className="text-3xl font-bold">892</div>
+                                <div className="text-purple-100 text-sm">Active Bidders</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            {/* Filters and Controls */}
+            <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+                <div className="bg-white rounded-2xl shadow-lg p-6 mb-8">
+                    <div className="flex flex-col lg:flex-row gap-6">
+                        {/* Search */}
+                        <div className="flex-1">
+                            <div className="relative">
+                                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-5 w-5" />
+                                <input
+                                    type="text"
+                                    placeholder="Search auctions..."
+                                    value={searchQuery}
+                                    onChange={(e) => setSearchQuery(e.target.value)}
+                                    className="w-full pl-12 pr-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-transparent text-lg"
+                                />
+                            </div>
+                        </div>
+
+                        {/* Price Range */}
+                        <div className="lg:w-64">
+                            <div className="flex items-center space-x-4">
+                                <div className="flex-1">
+                                    <label className="block text-sm font-medium text-gray-700 mb-2">Min Price</label>
+                                    <input
+                                        type="number"
+                                        min="0"
+                                        max="100000"
+                                        step="100"
+                                        value={minPrice}
+                                        onChange={(e) => {
+                                            const value = parseInt(e.target.value) || 0;
+                                            if (value <= maxPrice) setMinPrice(value);
+                                        }}
+                                        className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                                    />
+                                </div>
+                                <div className="flex-1">
+                                    <label className="block text-sm font-medium text-gray-700 mb-2">Max Price</label>
+                                    <input
+                                        type="number"
+                                        min="0"
+                                        max="100000"
+                                        step="100"
+                                        value={maxPrice}
+                                        onChange={(e) => {
+                                            const value = parseInt(e.target.value) || 100000;
+                                            if (value >= minPrice) setMaxPrice(value);
+                                        }}
+                                        className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                                    />
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Sort */}
+                        <div className="lg:w-48">
+                            <label className="block text-sm font-medium text-gray-700 mb-2">Sort By</label>
+                            <select
+                                value={sortBy}
+                                onChange={(e) => setSortBy(e.target.value)}
+                                className="w-full px-4 py-3 border border-gray-200 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                            >
+                                <option value="ending_soon">Ending Soon</option>
+                                <option value="newest">Newest First</option>
+                                <option value="price_low">Price: Low to High</option>
+                                <option value="price_high">Price: High to Low</option>
+                                <option value="most_bids">Most Bids</option>
+                            </select>
+                        </div>
+
+                        {/* View Mode */}
+                        <div className="lg:w-32">
+                            <label className="block text-sm font-medium text-gray-700 mb-2">View</label>
+                            <div className="flex bg-gray-100 rounded-lg p-1">
+                                <button
+                                    onClick={() => setViewMode('grid')}
+                                    className={`flex-1 py-2 px-3 rounded-md text-sm font-medium transition-all duration-200 flex items-center justify-center ${viewMode === 'grid'
+                                        ? 'bg-white text-purple-600 shadow-sm'
+                                        : 'text-gray-600 hover:text-gray-900'
+                                        }`}
+                                >
+                                    <Grid className="h-4 w-4" />
+                                </button>
+                                <button
+                                    onClick={() => setViewMode('list')}
+                                    className={`flex-1 py-2 px-3 rounded-md text-sm font-medium transition-all duration-200 flex items-center justify-center ${viewMode === 'list'
+                                        ? 'bg-white text-purple-600 shadow-sm'
+                                        : 'text-gray-600 hover:text-gray-900'
+                                        }`}
+                                >
+                                    <List className="h-4 w-4" />
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* Quick Filters */}
+                    <div className="flex flex-wrap gap-2 mt-6">
+                        <button
+                            onClick={() => { setMinPrice(0); setMaxPrice(500); }}
+                            className="px-4 py-2 bg-purple-100 text-purple-700 rounded-lg hover:bg-purple-200 transition-colors text-sm font-medium"
+                        >
+                            Under $500
+                        </button>
+                        <button
+                            onClick={() => { setMinPrice(500); setMaxPrice(2000); }}
+                            className="px-4 py-2 bg-purple-100 text-purple-700 rounded-lg hover:bg-purple-200 transition-colors text-sm font-medium"
+                        >
+                            $500 - $2K
+                        </button>
+                        <button
+                            onClick={() => { setMinPrice(2000); setMaxPrice(10000); }}
+                            className="px-4 py-2 bg-purple-100 text-purple-700 rounded-lg hover:bg-purple-200 transition-colors text-sm font-medium"
+                        >
+                            $2K - $10K
+                        </button>
+                        <button
+                            onClick={() => { setMinPrice(10000); setMaxPrice(100000); }}
+                            className="px-4 py-2 bg-purple-100 text-purple-700 rounded-lg hover:bg-purple-200 transition-colors text-sm font-medium"
+                        >
+                            $10K+
+                        </button>
+                        <button
+                            onClick={() => {
+                                setMinPrice(0);
+                                setMaxPrice(100000);
+                                setSearchQuery('');
+                                setSortBy('ending_soon');
+                            }}
+                            className="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors text-sm font-medium"
+                        >
+                            Clear All
+                        </button>
+                    </div>
+                </div>
+
+                {/* Auctions Content */}
+                {loading ? (
+                    <div className={viewMode === 'grid'
+                        ? 'grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6'
+                        : 'space-y-4'
+                    }>
+                        {[...Array(8)].map((_, i) => (
+                            <div key={i} className="bg-white rounded-xl shadow-sm overflow-hidden animate-pulse">
+                                <div className="w-full h-48 bg-gray-200"></div>
+                                <div className="p-4">
+                                    <div className="h-4 bg-gray-200 rounded mb-2"></div>
+                                    <div className="h-6 bg-gray-200 rounded w-20 mb-2"></div>
+                                    <div className="h-4 bg-gray-200 rounded w-16"></div>
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+                ) : sortedAuctions.length === 0 ? (
+                    <div className="text-center py-16">
+                        <div className="w-32 h-32 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-6">
+                            <Clock className="h-16 w-16 text-gray-400" />
+                        </div>
+                        <h3 className="text-2xl font-bold text-gray-900 mb-3">No auctions found</h3>
+                        <p className="text-gray-600 mb-8 text-lg">Try adjusting your filters or search terms.</p>
+                        <button
+                            onClick={() => {
+                                setSearchQuery('');
+                                setMinPrice(0);
+                                setMaxPrice(100000);
+                                setSortBy('ending_soon');
+                            }}
+                            className="inline-flex items-center px-8 py-4 bg-gradient-to-r from-purple-600 to-blue-600 text-white rounded-xl hover:from-purple-700 hover:to-blue-700 transition-all duration-200 font-semibold text-lg shadow-lg"
+                        >
+                            Clear Filters
+                        </button>
+                    </div>
+                ) : (
+                    <div className={viewMode === 'grid'
+                        ? 'grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6'
+                        : 'space-y-4'
+                    }>
+                        {sortedAuctions.map((auction) => (
+                            <AuctionCard
+                                key={auction.id}
+                                auction={auction}
+                                variant={viewMode === 'list' ? 'compact' : 'default'}
+                            />
+                        ))}
+                    </div>
+                )}
+            </div>
+        </div>
+    );
+}

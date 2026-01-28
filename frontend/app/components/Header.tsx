@@ -4,15 +4,14 @@ import { useState, useEffect, useRef } from 'react';
 import Link from 'next/link';
 import {
     Search,
-    ShoppingCart,
     ChevronDown,
+    ShoppingCart,
     Heart,
     Bell,
     MessageSquare,
     User,
     Menu,
     X,
-    Gavel,
     Plus,
     Package,
     CreditCard,
@@ -22,17 +21,19 @@ import {
     Star
 } from 'lucide-react';
 import { useAuthStore } from '@/lib/store/auth-store';
-import { categories } from '../data/categories';
 import ProfileDropdown from './ProfileDropdown';
 import { NotificationIcon } from './ui/NotificationBadge';
+import { categories } from '../data/categories';
 
 export default function Header() {
     const { user, isAuthenticated, logout } = useAuthStore();
-    const [isCategoryOpen, setCategoryOpen] = useState(false);
     const [isProfileOpen, setProfileOpen] = useState(false);
     const [isMobileMenuOpen, setMobileMenuOpen] = useState(false);
     const [searchQuery, setSearchQuery] = useState('');
+    const [selectedCategory, setSelectedCategory] = useState('All');
+    const [isCategoryDropdownOpen, setIsCategoryDropdownOpen] = useState(false);
     const profileDropdownRef = useRef<HTMLDivElement>(null);
+    const categoryDropdownRef = useRef<HTMLDivElement>(null);
 
     // Type-safe property access with defaults
     const userCartItems = 0; // TODO: Get from cart store
@@ -40,29 +41,32 @@ export default function Header() {
     const userRole = user?.role || 'BUYER';
     const userIsAdmin = user?.role === 'ADMIN';
 
-    const handleSearch = (e: React.FormEvent) => {
-        e.preventDefault();
+    const handleSearch = () => {
         if (searchQuery.trim()) {
-            window.location.href = `/advanced-search?q=${encodeURIComponent(searchQuery)}`;
+            const categoryParam = selectedCategory !== 'All' ? `&category=${encodeURIComponent(selectedCategory)}` : '';
+            window.location.href = `/advanced-search?q=${encodeURIComponent(searchQuery)}${categoryParam}`;
         }
     };
 
-    // Close profile dropdown when clicking outside
+    // Close dropdowns when clicking outside
     useEffect(() => {
         const handleClickOutside = (event: MouseEvent) => {
             if (profileDropdownRef.current && !profileDropdownRef.current.contains(event.target as Node)) {
                 setProfileOpen(false);
             }
+            if (categoryDropdownRef.current && !categoryDropdownRef.current.contains(event.target as Node)) {
+                setIsCategoryDropdownOpen(false);
+            }
         };
 
-        if (isProfileOpen) {
+        if (isProfileOpen || isCategoryDropdownOpen) {
             document.addEventListener('mousedown', handleClickOutside);
         }
 
         return () => {
             document.removeEventListener('mousedown', handleClickOutside);
         };
-    }, [isProfileOpen]);
+    }, [isProfileOpen, isCategoryDropdownOpen]);
 
     return (
         <header className="bg-white border-b border-gray-200 sticky top-0 z-50">
@@ -90,6 +94,84 @@ export default function Header() {
                             Help & Contact
                         </Link>
                     </div>
+
+                    {/* Search Bar in Top Bar */}
+                    <div className="hidden lg:flex items-center flex-1 max-w-md mx-8">
+                        <div className="flex items-stretch bg-white border border-gray-300 rounded-lg overflow-hidden shadow-sm hover:shadow-md transition-all duration-300 focus-within:border-blue-400 focus-within:ring-2 focus-within:ring-blue-100 w-full">
+                            {/* Category Dropdown */}
+                            <div
+                                ref={categoryDropdownRef}
+                                className="relative"
+                            >
+                                <div
+                                    onClick={() => {
+                                        console.log('Category dropdown clicked, current state:', isCategoryDropdownOpen);
+                                        setIsCategoryDropdownOpen(!isCategoryDropdownOpen);
+                                    }}
+                                    className="flex items-center px-3 py-2 text-xs text-gray-600 border-r border-gray-300 hover:bg-gray-50 transition-colors min-w-[80px] justify-between cursor-pointer"
+                                >
+                                    <span className="truncate">{selectedCategory}</span>
+                                    <ChevronDown size={12} className={`ml-1 transition-transform ${isCategoryDropdownOpen ? 'rotate-180' : ''}`} />
+                                </div>
+
+                                {isCategoryDropdownOpen && (
+                                    <div className="absolute top-full left-0 z-[9999] mt-1 w-56 bg-white border border-gray-200 rounded-lg shadow-xl max-h-64 overflow-y-auto">
+                                        <div className="py-1">
+                                            <div className="px-3 py-2 text-xs font-bold text-blue-600 bg-blue-50">
+                                                DEBUG: Dropdown is open!
+                                            </div>
+                                            <div
+                                                onClick={() => {
+                                                    setSelectedCategory('All');
+                                                    setIsCategoryDropdownOpen(false);
+                                                }}
+                                                className="w-full text-left px-3 py-2 text-xs text-gray-700 hover:bg-gray-100 transition-colors cursor-pointer"
+                                            >
+                                                All Categories
+                                            </div>
+                                            {Object.entries(categories).map(([mainCategory, subCategories]) => (
+                                                <div key={mainCategory}>
+                                                    <div className="px-3 py-1 text-xs font-semibold text-gray-500 bg-gray-50">
+                                                        {mainCategory}
+                                                    </div>
+                                                    {subCategories.map(sub => (
+                                                        <div
+                                                            key={sub}
+                                                            onClick={() => {
+                                                                setSelectedCategory(sub);
+                                                                setIsCategoryDropdownOpen(false);
+                                                            }}
+                                                            className="w-full text-left px-6 py-1 text-xs text-gray-700 hover:bg-gray-100 transition-colors cursor-pointer"
+                                                        >
+                                                            {sub}
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                            ))}
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
+
+                            <div className="flex items-center pl-3 pr-2">
+                                <Search size={16} className="text-gray-400" />
+                            </div>
+                            <input
+                                type="text"
+                                placeholder="Search..."
+                                value={searchQuery}
+                                onChange={(e) => setSearchQuery(e.target.value)}
+                                className="flex-1 py-2 px-1 outline-none text-sm placeholder-gray-500 bg-transparent"
+                            />
+                            <button
+                                onClick={handleSearch}
+                                className="bg-blue-600 text-white px-3 py-2 text-xs font-medium hover:bg-blue-700 transition-colors"
+                            >
+                                Search
+                            </button>
+                        </div>
+                    </div>
+
                     <div className="hidden md:flex items-center gap-6">
                         <Link href="/sell" className="hover:text-blue-600 transition-colors flex items-center bg-green-100 text-green-800 px-3 py-1 rounded-full font-medium">
                             <Plus className="h-3 w-3 mr-1" />
@@ -166,92 +248,9 @@ export default function Header() {
                     </button>
                 </div>
 
-                {/* Main Header */}
-                <div className="flex items-center py-4 px-4 gap-6">
-                    {/* Logo */}
-                    <Link href="/" className="flex items-center group flex-shrink-0">
-                        <div className="bg-gradient-to-br from-blue-600 to-indigo-600 text-white p-2.5 rounded-xl mr-3 shadow-lg group-hover:scale-105 transition-transform duration-300">
-                            <Gavel className="h-5 w-5" />
-                        </div>
-                        <h1 className="text-2xl font-bold bg-gradient-to-r from-blue-600 to-indigo-600 bg-clip-text text-transparent">
-                            InstaSell
-                        </h1>
-                    </Link>
-
-                    {/* Enhanced Search Bar - Takes up more space */}
-                    <div className="flex-1 max-w-4xl">
-                        <form onSubmit={handleSearch} className="flex items-stretch bg-gray-50 border-2 border-gray-200 rounded-2xl overflow-hidden shadow-sm hover:shadow-lg transition-all duration-300 focus-within:border-blue-500 focus-within:ring-4 focus-within:ring-blue-100 focus-within:bg-white">
-                            <div className="flex items-center pl-5 pr-3">
-                                <Search size={20} className="text-gray-400" />
-                            </div>
-                            <input
-                                type="text"
-                                placeholder="Search for anything..."
-                                value={searchQuery}
-                                onChange={(e) => setSearchQuery(e.target.value)}
-                                className="flex-1 py-4 px-2 outline-none text-base placeholder-gray-500 bg-transparent"
-                            />
-                            <select className="text-sm text-gray-600 border-l-2 border-gray-200 px-4 py-4 bg-white outline-none hover:bg-gray-50 transition-colors min-w-[140px] font-medium">
-                                <option>All Categories</option>
-                                <option>Electronics</option>
-                                <option>Fashion</option>
-                                <option>Home & Garden</option>
-                                <option>Collectibles</option>
-                                <option>Vehicles</option>
-                                <option>Sports</option>
-                            </select>
-                            <button type="submit" className="bg-gradient-to-r from-blue-600 to-blue-700 text-white font-semibold px-8 py-4 text-sm hover:from-blue-700 hover:to-blue-800 transition-all duration-300 flex items-center justify-center">
-                                Search
-                            </button>
-                        </form>
-                    </div>
-
-                    {/* Right Side Actions - More Compact */}
-                    <div className="flex items-center gap-2 flex-shrink-0">
-                        {/* Shop by Category */}
-                        <div className="hidden lg:block relative" onMouseEnter={() => setCategoryOpen(true)} onMouseLeave={() => setCategoryOpen(false)}>
-                            <button className="flex items-center gap-2 text-sm text-gray-700 hover:text-blue-600 px-4 py-3 rounded-xl hover:bg-blue-50 transition-all duration-200 font-medium border border-gray-200 hover:border-blue-200">
-                                <span>Categories</span>
-                                <ChevronDown size={16} />
-                            </button>
-                            {isCategoryOpen && (
-                                <div className="absolute top-full right-0 w-[700px] max-h-[70vh] bg-white border border-gray-200 shadow-xl rounded-lg z-50 overflow-hidden">
-                                    {/* Scrollable Content */}
-                                    <div className="overflow-y-auto max-h-[60vh] p-6 scrollbar-thin scrollbar-thumb-gray-300 scrollbar-track-gray-100">
-                                        <div className="grid grid-cols-3 gap-6">
-                                            {Object.entries(categories).map(([mainCategory, subCategories]) => (
-                                                <div key={mainCategory}>
-                                                    <h3 className="font-semibold mb-2 text-blue-600 sticky top-0 bg-white py-1">{mainCategory}</h3>
-                                                    <ul className="space-y-1 text-xs text-gray-600">
-                                                        {subCategories.map(sub => (
-                                                            <li key={sub}>
-                                                                <Link
-                                                                    href={`/category/${sub.toLowerCase().replace(/\s&\s/g, '-').replace(/\s/g, '-')}`}
-                                                                    className="hover:underline hover:text-blue-600 block py-1 hover:bg-gray-50 px-2 rounded transition-colors"
-                                                                >
-                                                                    {sub}
-                                                                </Link>
-                                                            </li>
-                                                        ))}
-                                                    </ul>
-                                                </div>
-                                            ))}
-                                        </div>
-                                    </div>
-                                    {/* Fixed Footer */}
-                                    <div className="border-t border-gray-200 p-4 bg-gray-50">
-                                        <Link href="/all-categories" className="font-semibold text-blue-600 hover:underline flex items-center justify-center">
-                                            View All Categories →
-                                        </Link>
-                                    </div>
-                                </div>
-                            )}
-                        </div>
-
-                        <Link href="/advanced-search" className="hidden lg:block text-sm text-gray-700 hover:text-blue-600 px-4 py-3 rounded-xl hover:bg-blue-50 transition-all duration-200 font-medium border border-gray-200 hover:border-blue-200">
-                            Advanced
-                        </Link>
-                    </div>
+                {/* Main Header - Simplified */}
+                <div className="flex items-center justify-end py-4 px-4 gap-6">
+                    {/* Right Side Actions Only */}
 
                     {/* Mobile Actions */}
                     <div className="md:hidden flex items-center gap-2">
@@ -291,24 +290,6 @@ export default function Header() {
                 <div className="hidden md:flex justify-center items-center gap-1 text-sm py-2 bg-white border-t border-gray-100">
                     <Link href="/" className="font-medium text-blue-600 hover:text-blue-700 px-4 py-2 rounded-lg hover:bg-blue-50 transition-all duration-200">
                         Home
-                    </Link>
-                    <Link href="/saved" className="flex items-center gap-1.5 text-gray-700 hover:text-blue-600 px-4 py-2 rounded-lg hover:bg-gray-50 transition-all duration-200">
-                        <Heart size={14} /> Saved
-                    </Link>
-                    <Link href="/saved-bids" className="flex items-center gap-1.5 text-gray-700 hover:text-blue-600 px-4 py-2 rounded-lg hover:bg-gray-50 transition-all duration-200">
-                        <Gavel size={14} /> Saved Bids
-                    </Link>
-                    <Link href="/category/electronics" className="text-gray-700 hover:text-blue-600 px-4 py-2 rounded-lg hover:bg-gray-50 transition-all duration-200">
-                        Electronics
-                    </Link>
-                    <Link href="/category/fashion" className="text-gray-700 hover:text-blue-600 px-4 py-2 rounded-lg hover:bg-gray-50 transition-all duration-200">
-                        Fashion
-                    </Link>
-                    <Link href="/category/collectibles" className="text-gray-700 hover:text-blue-600 px-4 py-2 rounded-lg hover:bg-gray-50 transition-all duration-200">
-                        Collectibles
-                    </Link>
-                    <Link href="/auctions" className="flex items-center gap-1.5 text-purple-600 hover:text-purple-700 font-medium px-4 py-2 rounded-lg bg-purple-50 hover:bg-purple-100 transition-all duration-200">
-                        <Gavel size={14} /> Live Auctions
                     </Link>
                 </div>
 
@@ -374,10 +355,6 @@ export default function Header() {
                             {/* Special Sections */}
                             <div className="border-t border-gray-200 pt-4">
                                 <div className="space-y-2">
-                                    <Link href="/auctions" className="flex items-center text-purple-600 hover:text-purple-700">
-                                        <Gavel className="h-4 w-4 mr-2" />
-                                        Live Auctions
-                                    </Link>
                                     <Link href="/daily-deals" className="flex items-center text-green-600 hover:text-green-700">
                                         <Star className="h-4 w-4 mr-2" />
                                         Daily Deals

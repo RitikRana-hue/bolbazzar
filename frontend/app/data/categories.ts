@@ -1,28 +1,4 @@
 export const categories = {
-    "Electronics": [
-        "Smartphones & Accessories",
-        "Laptops & Computers",
-        "Tablets & E-readers",
-        "Audio & Headphones",
-        "Cameras & Photography",
-        "Gaming Consoles",
-        "Smart Home Devices",
-        "Wearable Technology",
-        "Computer Components",
-        "Networking Equipment"
-    ],
-    "Fashion": [
-        "Men's Clothing",
-        "Women's Clothing",
-        "Shoes & Footwear",
-        "Bags & Accessories",
-        "Jewelry & Watches",
-        "Sunglasses & Eyewear",
-        "Designer Items",
-        "Vintage Fashion",
-        "Athletic Wear",
-        "Formal Wear"
-    ],
     "Home & Garden": [
         "Furniture",
         "Home Decor",
@@ -35,18 +11,6 @@ export const categories = {
         "Storage & Organization",
         "Home Improvement"
     ],
-    "Collectibles & Art": [
-        "Trading Cards",
-        "Coins & Currency",
-        "Stamps",
-        "Antiques",
-        "Fine Art",
-        "Vintage Items",
-        "Memorabilia",
-        "Books & Manuscripts",
-        "Pottery & Glass",
-        "Sculptures"
-    ],
     "Vehicles": [
         "Cars & Trucks",
         "Motorcycles",
@@ -55,7 +19,6 @@ export const categories = {
         "Auto Parts",
         "Motorcycle Parts",
         "Tires & Wheels",
-        "Car Electronics",
         "Tools & Equipment",
         "Classic Cars"
     ],
@@ -75,13 +38,11 @@ export const categories = {
         "Books",
         "Movies & TV",
         "Music",
-        "Video Games",
         "Magazines",
         "Educational Materials",
         "E-books",
         "Audiobooks",
-        "Sheet Music",
-        "Software"
+        "Sheet Music"
     ],
     "Health & Beauty": [
         "Skincare",
@@ -101,7 +62,6 @@ export const categories = {
         "Building Sets",
         "Dolls & Bears",
         "Educational Toys",
-        "Electronic Toys",
         "Model Kits",
         "Puzzles",
         "Remote Control",
@@ -122,21 +82,21 @@ export const categories = {
 };
 
 export const popularCategories = [
-    "Electronics",
-    "Fashion",
     "Home & Garden",
-    "Collectibles & Art",
     "Vehicles",
-    "Sports & Recreation"
+    "Sports & Recreation",
+    "Books & Media",
+    "Health & Beauty",
+    "Toys & Hobbies"
 ];
 
 export const trendingCategories = [
-    "Smartphones & Accessories",
-    "Laptops & Computers",
-    "Designer Items",
-    "Trading Cards",
+    "Furniture",
     "Cars & Trucks",
-    "Exercise Equipment"
+    "Exercise Equipment",
+    "Books",
+    "Skincare",
+    "Board Games"
 ];
 
 export function getCategorySlug(categoryName: string): string {

@@ -1,6 +1,5 @@
 import { create } from 'zustand';
 import { User } from '../types';
-import { authApi } from '../api/auth';
 
 interface AuthState {
     user: User | null;
@@ -28,29 +27,52 @@ export const useAuthStore = create<AuthState>((set) => ({
     login: async (email, password) => {
         set({ isLoading: true, error: null });
         try {
-            const response = await authApi.login({ email, password });
+            // Hardcoded credentials for demo
+            const validCredentials = [
+                { email: 'admin@instasell.com', password: 'admin123', role: 'ADMIN', username: 'Admin' },
+                { email: 'user@instasell.com', password: 'user123', role: 'BUYER', username: 'Demo User' },
+                { email: 'seller@instasell.com', password: 'seller123', role: 'SELLER', username: 'Demo Seller' }
+            ];
 
-            // Store tokens with correct keys
-            if (typeof window !== 'undefined') {
-                localStorage.setItem('auth_token', response.token);
-                localStorage.setItem('user', JSON.stringify(response.user));
+            const user = validCredentials.find(cred => cred.email === email && cred.password === password);
+
+            if (!user) {
+                throw new Error('Invalid email or password');
             }
 
-            set({ user: response.user, isAuthenticated: true, isLoading: false });
+            // Create mock user object
+            const mockUser: User = {
+                id: Math.random().toString(36).substring(7),
+                email: user.email,
+                username: user.username,
+                role: user.role as 'BUYER' | 'SELLER' | 'ADMIN' | 'DELIVERY_AGENT',
+                isEmailVerified: true,
+                isActive: true,
+                createdAt: new Date().toISOString()
+            };
+
+            // Store mock token and user
+            if (typeof window !== 'undefined') {
+                localStorage.setItem('auth_token', 'mock-jwt-token-' + Date.now());
+                localStorage.setItem('user', JSON.stringify(mockUser));
+            }
+
+            set({ user: mockUser, isAuthenticated: true, isLoading: false });
         } catch (error: any) {
-            const errorMessage = error.response?.data?.error || error.message || 'Login failed';
+            const errorMessage = error.message || 'Login failed';
             set({ error: errorMessage, isLoading: false });
             throw new Error(errorMessage);
         }
     },
 
-    register: async (email, password, username, role) => {
+    register: async (_email, _password, _username, _role) => {
         set({ isLoading: true, error: null });
         try {
-            await authApi.register({ email, password, username, role });
+            // Mock registration - just simulate success
+            await new Promise(resolve => setTimeout(resolve, 1000));
             set({ isLoading: false });
         } catch (error: any) {
-            const errorMessage = error.response?.data?.error || 'Registration failed';
+            const errorMessage = 'Registration failed';
             set({ error: errorMessage, isLoading: false });
             throw new Error(errorMessage);
         }
@@ -59,7 +81,8 @@ export const useAuthStore = create<AuthState>((set) => ({
     logout: async () => {
         set({ isLoading: true });
         try {
-            await authApi.logout();
+            // Mock logout - just clear data
+            await new Promise(resolve => setTimeout(resolve, 500));
         } catch (error) {
             // Continue with logout even if API call fails
         } finally {
@@ -81,8 +104,16 @@ export const useAuthStore = create<AuthState>((set) => ({
     fetchCurrentUser: async () => {
         set({ isLoading: true });
         try {
-            const response = await authApi.getCurrentUser();
-            set({ user: response.user, isAuthenticated: true, isLoading: false });
+            // Mock fetch current user - get from localStorage
+            if (typeof window !== 'undefined') {
+                const userStr = localStorage.getItem('user');
+                if (userStr) {
+                    const user = JSON.parse(userStr);
+                    set({ user, isAuthenticated: true, isLoading: false });
+                    return;
+                }
+            }
+            set({ user: null, isAuthenticated: false, isLoading: false });
         } catch (error) {
             set({ user: null, isAuthenticated: false, isLoading: false });
         }
